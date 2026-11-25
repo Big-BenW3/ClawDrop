@@ -1,0 +1,17 @@
+pub mod claim;
+pub mod close_machine;
+pub mod create_collection;
+pub mod delegate_play;
+pub mod drop_claw;
+pub mod force_expire;
+pub mod grab_callback;
+pub mod init_machine;
+pub mod insert_credit;
+pub mod nudge;
+pub mod set_collection;
+pub mod set_paused;
+pub mod sell_back;
+pub mod set_slot;
+pub mod set_uri_prefix;
+pub mod settle;
+pub mod vault;

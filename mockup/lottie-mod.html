@@ -1,0 +1,10 @@
+<script type="module">
+import {DotLottie} from 'https://cdn.jsdelivr.net/npm/@lottiefiles/dotlottie-web@0.83.2/+esm';
+const LD=window.LOTTIE_DATA||{};const dec=n=>{const b=atob(LD[n]);const u=new Uint8Array(b.length);for(let i=0;i<b.length;i++)u[i]=b.charCodeAt(i);return u.buffer};
+const mount=cv=>{if(cv.__lt||!LD[cv.dataset.lottie])return;cv.__lt=1;const r=cv.getBoundingClientRect();const d=Math.min(devicePixelRatio||1,2);
+ cv.width=Math.max(64,Math.round((r.width||160)*d));cv.height=Math.max(64,Math.round((r.height||160)*d));
+ try{new DotLottie({canvas:cv,data:dec(cv.dataset.lottie),autoplay:true,loop:true})}catch(e){console.warn('lottie',e)}};
+const scan=(root=document)=>root.querySelectorAll&&root.querySelectorAll('canvas[data-lottie]').forEach(mount);
+new MutationObserver(m=>{for(const x of m)x.addedNodes.forEach(n=>{if(n.nodeType===1){if(n.matches('canvas[data-lottie]'))mount(n);scan(n)}})}).observe(document.documentElement,{childList:true,subtree:true});
+scan();
+</script>

@@ -1,0 +1,2751 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>CLAW DROP — Skill drops the claw. Luck you can verify.</title>
+
+  <!-- Fonts: Fredoka (Chunky rounded arcade display), Inter (Clean UI), JetBrains Mono (VRF rolls, odds, TX) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://api.fontshare.com/v2/css?f[]=clash-display@500,600,700&f[]=satoshi@400,500,700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            base: '#0B0E14',
+            panel: '#141A26',
+            panelHover: '#1B2333',
+            ink: '#E8ECF4',
+            muted: '#8A93A6',
+            accent: '#A855F7',
+            win: '#34D399',
+            alert: '#F87171',
+            link: '#60A5FA',
+            legendary: '#F5B301',
+            epic: '#A855F7',
+            rare: '#3B82F6',
+            common: '#9AA4B2',
+          },
+          fontFamily: {
+            display: ['Clash Display', 'Fredoka', 'sans-serif'],
+            sans: ['Satoshi', 'Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          boxShadow: {
+            'neon-violet': '0 0 28px rgba(168, 85, 247, 0.35)',
+            'neon-gold': '0 0 28px rgba(245, 179, 1, 0.35)',
+            'neon-win': '0 0 28px rgba(52, 211, 153, 0.35)',
+            'neon-alert': '0 0 28px rgba(248, 113, 113, 0.4)',
+            'glass': '0 20px 50px rgba(0, 0, 0, 0.65)',
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Three.js for real-time 3D Claw Machine -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <style>
+    :root {
+      --bg-base: #0B0E14;
+      --bg-panel: #141A26;
+      --ink: #E8ECF4;
+      --ink-muted: #8A93A6;
+      --accent: #A855F7;
+      --win: #34D399;
+      --alert: #F87171;
+      --link: #60A5FA;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      background-color: #08090D;
+      color: #E8ECF4;
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background-color: #08090D;
+      color: #E8ECF4;
+      overflow-x: hidden;
+    }
+
+    /* Springy arcade transitions */
+    .spring-btn {
+      transition: transform 0.32s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease, background-color 0.2s ease, border-color 0.2s ease;
+    }
+    .spring-btn:hover:not(:disabled) {
+      transform: translateY(-2px) scale(1.015);
+    }
+    .spring-btn:active:not(:disabled) {
+      transform: translateY(1px) scale(0.97);
+    }
+
+    .spring-sheet {
+      transition: transform 0.42s cubic-bezier(0.22, 1.25, 0.36, 1), opacity 0.28s ease;
+    }
+
+    /* Glassy panel surface */
+    .glass-panel {
+      background: rgba(20, 26, 38, 0.82);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid rgba(232, 236, 244, 0.09);
+    }
+
+    .glass-card {
+      background: linear-gradient(160deg, rgba(26, 34, 50, 0.9) 0%, rgba(16, 21, 31, 0.94) 100%);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* Background now comes from the fixed #bg-space canvas */
+    .arcade-grid { background: transparent; }
+
+
+    #bg-space { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; }
+    #hero > .hero-inner { position: relative; z-index: 2; }
+    /* card spotlight: soft light follows the cursor inside the card */
+    .spot { position: relative; --mx: 50%; --my: 0%; }
+    .spot::before { content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0; transition: opacity .35s ease;
+      background: radial-gradient(420px circle at var(--mx) var(--my), rgba(168,85,247,.16), transparent 60%); }
+    .spot:hover::before { opacity: 1; }
+    .spot::after { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; opacity: 0; transition: opacity .35s ease;
+      background: radial-gradient(260px circle at var(--mx) var(--my), rgba(192,132,252,.9), transparent 65%);
+      -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+    .spot:hover::after { opacity: 1; }
+    .how-step-item { transition: transform .5s cubic-bezier(.22,1.2,.36,1), opacity .35s ease, background-color .35s ease, border-color .35s ease; position: relative; overflow: hidden; }
+    .how-step-item.is-active { translate: 10px 0; }
+    .how-bar { position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: linear-gradient(90deg,#A855F7,#F0ABFC); transform: scaleX(0); transform-origin: left; }
+    .how-step-item.is-active .how-bar { animation: howfill 6s linear forwards; }
+    #how-steps-list:hover .how-bar, #how-stage-card:hover ~ * .how-bar { animation-play-state: paused; }
+    @keyframes howfill { to { transform: scaleX(1); } }
+    #how-stage-card { transform-style: preserve-3d; transition: transform .25s ease-out; will-change: transform; }
+    .how-enter > * { opacity: 0; transform: translateY(18px) scale(.97); filter: blur(6px); animation: howIn .6s cubic-bezier(.22,1.2,.36,1) forwards; }
+    .how-enter > *:nth-child(2) { animation-delay: .08s; } .how-enter > *:nth-child(3) { animation-delay: .16s; }
+    .how-enter > *:nth-child(4) { animation-delay: .24s; } .how-enter > *:nth-child(5) { animation-delay: .32s; }
+    @keyframes howIn { to { opacity: 1; transform: none; filter: none; } }
+    @keyframes spinSlow { to { transform: rotate(360deg); } }
+    .spin-slow { animation: spinSlow 14s linear infinite; }
+    @keyframes sheen { from { transform: translateX(-120%); } to { transform: translateX(220%); } }
+    /* polish: soft ambient glows for inner pages */
+    #view-collection, #view-fairness { background: radial-gradient(900px 420px at 15% -5%, rgba(139,61,240,.20), transparent 60%), radial-gradient(700px 380px at 95% 8%, rgba(245,196,81,.08), transparent 60%), #08090D !important; }
+    #view-collection .glass-card, #view-fairness .glass-card { background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02)) !important; }
+    #collection-slots-grid > div:not(:has(canvas)) { background: rgba(255,255,255,.02); border-color: rgba(168,85,247,.28) !important; }
+    .reveal-up { opacity: 0; transform: translateY(26px); transition: opacity .7s ease, transform .7s cubic-bezier(.22,1.1,.36,1); }
+    .reveal-up.in { opacity: 1; transform: none; }
+
+
+    /* ---- card system v2 (hairline gradient border, inner highlight, cursor spotlight, glare, tilt) ---- */
+    .glass-card { background: linear-gradient(180deg, rgba(255,255,255,.045) 0%, rgba(255,255,255,.015) 100%), rgba(9,11,18,.62) !important;
+      backdrop-filter: blur(18px) saturate(1.2); -webkit-backdrop-filter: blur(18px) saturate(1.2);
+      border: 1px solid rgba(255,255,255,.075) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.07), inset 0 0 0 1px rgba(255,255,255,.012), 0 24px 60px -28px rgba(0,0,0,.85) !important; }
+    .tilt { transform-style: preserve-3d; transition: transform .35s cubic-bezier(.22,1,.36,1); will-change: transform; }
+    .glare { overflow: hidden; }
+    .glare .glare-sweep { position: absolute; inset: -40%; pointer-events: none; opacity: 0; transform: translateX(-60%) rotate(18deg);
+      background: linear-gradient(90deg, transparent 35%, rgba(255,255,255,.10) 50%, transparent 65%); transition: transform .9s cubic-bezier(.22,1,.36,1), opacity .3s ease; }
+    .glare:hover .glare-sweep { opacity: 1; transform: translateX(60%) rotate(18deg); }
+    .split-word { display: inline-block; opacity: 0; filter: blur(10px); transform: translateY(.5em);
+      animation: wordIn .8s cubic-bezier(.22,1.1,.36,1) forwards; animation-delay: calc(var(--i) * 70ms + var(--d, 0ms)); }
+    @keyframes wordIn { to { opacity: 1; filter: blur(0); transform: none; } }
+    .kicker { letter-spacing: .18em; }
+
+
+    /* ---- section theming: light roster, solid CTA ---- */
+    .sec-light { background: #F3EEE6; color: #14110F; }
+    .sec-light .text-ink { color: #14110F !important; } .sec-light .text-muted { color: #6B645B !important; }
+    .sec-light .prize-chip:not(.bg-accent) { background: #fff !important; color: #4b453d !important; border-color: rgba(20,17,15,.1) !important; }
+    .sec-light .glass-card { background: #fff !important; border: 1px solid rgba(20,17,15,.07) !important; backdrop-filter: none; -webkit-backdrop-filter: none;
+      box-shadow: 0 1px 0 #fff inset, 0 22px 44px -26px rgba(60,40,20,.38) !important; }
+    .sec-light .glass-card .glare-sweep { background: linear-gradient(90deg, transparent 35%, rgba(168,85,247,.10) 50%, transparent 65%); }
+    .sec-light p.text-center { color: #6B645B; }
+    .cta-rect.glass-card { background: #8B3DF0 !important; border: 0 !important; box-shadow: 0 30px 80px -30px rgba(139,61,240,.7) !important; }
+    .cta-rect .text-ink { color: #fff !important; } .cta-rect .text-muted { color: rgba(255,255,255,.78) !important; } .cta-rect .text-accent { color: #fff !important; }
+    .cta-rect .bg-accent\/15 { background: rgba(255,255,255,.16) !important; border-color: rgba(255,255,255,.3) !important; }
+    h1, h2, h3 { letter-spacing: -0.02em; }
+
+    /* Floating parallax animation */
+    @keyframes floatSlow {
+      0%, 100% { transform: translateY(0px) rotate(-3deg); }
+      50% { transform: translateY(-14px) rotate(3deg); }
+    }
+    @keyframes floatSlowReverse {
+      0%, 100% { transform: translateY(0px) rotate(4deg); }
+      50% { transform: translateY(12px) rotate(-2deg); }
+    }
+    .animate-float-1 { animation: floatSlow 5.5s ease-in-out infinite; }
+    .animate-float-2 { animation: floatSlowReverse 6.4s ease-in-out infinite; }
+
+    /* Tactile DROP button */
+    .drop-btn {
+      background: radial-gradient(circle at 35% 30%, #FF9B9B 0%, #F87171 45%, #DC2626 100%);
+      box-shadow:
+        0 8px 0 #7F1D1D,
+        0 14px 30px rgba(248, 113, 113, 0.45),
+        inset 0 2px 4px rgba(255, 255, 255, 0.45);
+      transition: transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.14s ease;
+    }
+    .drop-btn:active:not(:disabled) {
+      transform: translateY(6px) scale(0.97);
+      box-shadow:
+        0 2px 0 #7F1D1D,
+        0 6px 15px rgba(248, 113, 113, 0.35),
+        inset 0 2px 4px rgba(255, 255, 255, 0.3);
+    }
+
+    /* Sticker card styling inspired by bold comic trading cards */
+    .sticker-outline {
+      filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.55));
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0B0E14; }
+    ::-webkit-scrollbar-thumb { background: #263044; border-radius: 999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #A855F7; }
+  </style>
+</head>
+<body class="text-ink antialiased selection:bg-accent/30 selection:text-white">
+
+  <!-- =====================================================================
+       PERSISTENT TOP PROTOTYPE NAVIGATOR (Quick screen switcher + Brand context)
+       Allows seamless user flow AND instant jumping to inspect any brief screen
+  ===================================================================== -->
+  <div id="proto-switcher" class="fixed top-3 left-1/2 -translate-x-1/2 z-50 hidden md:flex items-center gap-1 px-2 py-1.5 rounded-full glass-panel shadow-glass text-xs">
+    <span class="px-2.5 py-1 font-mono text-[11px] uppercase tracking-wider text-muted border-r border-white/10 mr-1">Screens</span>
+    <button onclick="navigateTo('landing')" data-nav="landing" class="nav-pill px-3 py-1 rounded-full font-medium transition-colors">Landing</button>
+    <button onclick="navigateTo('arcade')" data-nav="arcade" class="nav-pill px-3 py-1 rounded-full font-medium transition-colors">Arcade</button>
+    <button onclick="navigateTo('play')" data-nav="play" class="nav-pill px-3 py-1 rounded-full font-medium transition-colors">Play (15s)</button>
+    <button onclick="navigateTo('collection')" data-nav="collection" class="nav-pill px-3 py-1 rounded-full font-medium transition-colors">Collection</button>
+    <button onclick="navigateTo('fairness')" data-nav="fairness" class="nav-pill px-3 py-1 rounded-full font-medium transition-colors">Fairness</button>
+  </div>
+
+  <!-- =====================================================================
+       VIEW 1: LANDING PAGE (4 Scroll-Driven Full-Screen Sections)
+  ===================================================================== -->
+  <div id="view-landing" class="relative w-full arcade-grid">
+
+    <!-- Landing Top Nav -->
+    <header class="sticky top-0 z-40 w-full px-4 sm:px-8 py-4">
+      <div class="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 py-3 rounded-full glass-panel">
+        <!-- Logo -->
+        <a href="#hero" class="flex items-center gap-2.5 group">
+          <div class="w-9 h-9 rounded-2xl bg-accent/20 border border-accent/40 flex items-center justify-center shadow-neon-violet group-hover:scale-105 transition-transform">
+            <svg class="w-5 h-5 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2v5" />
+              <circle cx="12" cy="9" r="2" />
+              <path d="M10 10.5L6 15l2.5 4.5" />
+              <path d="M14 10.5L18 15l-2.5 4.5" />
+              <path d="M12 11v7" />
+            </svg>
+          </div>
+          <span class="font-display font-bold text-xl tracking-tight text-ink">CLAW<span class="text-accent">DROP</span></span>
+        </a>
+
+        <!-- Center-right links + Play CTA -->
+        <div class="flex items-center gap-4 sm:gap-7">
+          <nav class="hidden sm:flex items-center gap-6 text-sm font-medium text-muted">
+            <a href="#how-it-works" class="hover:text-ink transition-colors">How it works</a>
+            <a href="#prizes" class="hover:text-ink transition-colors">Prizes</a>
+            <a href="#fairness-preview" onclick="event.preventDefault(); navigateTo('fairness');" class="hover:text-ink transition-colors">Fairness</a>
+          </nav>
+          <button onclick="navigateTo('arcade')" class="spring-btn px-5 py-2 rounded-full bg-accent hover:bg-purple-500 text-white font-display font-semibold text-sm shadow-neon-violet cursor-pointer">
+            Play
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- SECTION 1 — HERO -->
+    <section id="hero" class="relative min-h-[92vh] flex items-center px-4 sm:px-8 pt-6 pb-24 overflow-hidden">
+      <canvas id="bg-space"></canvas>
+      <div class="pointer-events-none absolute inset-x-0 bottom-0 h-48 z-[1]" style="background:linear-gradient(to bottom, transparent, #08090D)"></div>
+      <!-- Side edge parallax floating creatures & gems -->
+      <div id="parallax-left" class="pointer-events-none hidden absolute left-4 top-[58%] z-10 opacity-85 transition-transform duration-150">
+        <div class="animate-float-1 w-24 h-24 rounded-3xl glass-card p-2 border-legendary/40 shadow-neon-gold" id="hero-float-card-1"></div>
+        <div class="mt-6 ml-8 w-10 h-10 rounded-2xl bg-accent/20 border border-accent/40 flex items-center justify-center rotate-12 shadow-neon-violet">
+          <span class="text-accent text-lg">✦</span>
+        </div>
+      </div>
+
+      <div id="parallax-right" class="pointer-events-none hidden xl:block absolute right-4 top-[12%] z-10 opacity-85 transition-transform duration-150">
+        <div class="w-11 h-11 rounded-2xl bg-win/20 border border-win/40 flex items-center justify-center -rotate-12 mb-6 ml-auto shadow-neon-win">
+          <span class="text-win text-lg">◈</span>
+        </div>
+        <div class="animate-float-2 w-24 h-24 rounded-3xl glass-card p-2 border-epic/40 shadow-neon-violet" id="hero-float-card-2"></div>
+      </div>
+
+      <div class="hero-inner max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
+        <!-- Left Copy -->
+        <div class="lg:col-span-6 space-y-6 z-10">
+          
+
+          <h1 class="font-display font-bold text-4xl sm:text-6xl lg:text-[62px] leading-[1.06] tracking-tight text-ink">
+            Skill drops the claw.<br />
+            <span class="text-accent drop-shadow-[0_0_24px_rgba(168,85,247,0.45)]">Luck you can verify.</span>
+          </h1>
+
+          <p class="text-[1rem] sm:text-lg text-muted max-w-lg leading-relaxed">
+            Line up the mechanical claw in real time, trigger a provably fair on-chain VRF grip roll, and claim collectible NFT creatures straight to your wallet.
+          </p>
+
+          <div class="flex flex-wrap items-center gap-3.5 pt-2">
+            <button onclick="startQuickPlayFromLanding()" class="spring-btn px-7 py-4 rounded-full bg-accent hover:bg-purple-500 text-white font-display font-semibold text-[1rem] sm:text-lg shadow-neon-violet flex items-center gap-2.5 cursor-pointer">
+              <span>Play now</span>
+              <span class="text-white/60">·</span>
+              <span class="font-mono text-sm sm:text-[1rem] font-semibold">0.05 SOL</span>
+            </button>
+            <a href="#how-it-works" class="spring-btn px-7 py-4 rounded-full bg-panel/80 hover:bg-panelHover border border-white/15 text-ink font-display font-semibold text-[1rem] sm:text-lg">
+              See how it works
+            </a>
+          </div>
+
+          <!-- Micro proof strip -->
+          <div class="pt-4 flex flex-wrap items-center gap-6 text-xs font-mono text-muted">
+            <div class="flex items-center gap-2">
+              <span class="text-win">✓</span> 0.00 SOL rollup gas
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-accent">✓</span> 100% public VRF proof
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-legendary">✓</span> Instant sell-back liquidity
+            </div>
+          </div>
+        </div>
+
+        <!-- Right-Weighted 3D Claw Machine Showcase -->
+        <div class="lg:col-span-6 relative">
+          <div class="relative w-full h-[430px] sm:h-[510px] rounded-[32px] glass-card overflow-hidden border border-accent/30 shadow-neon-violet">
+            <!-- Top cabinet status bar -->
+            <div class="absolute top-4 left-4 right-4 z-10 flex items-center justify-between pointer-events-none">
+              <span></span>
+              <span class="px-3 py-1 rounded-full bg-base/80 border border-white/10 font-mono text-[11px] text-muted">
+                Drag to orbit
+              </span>
+            </div>
+
+            <!-- Canvas host for Hero 3D Machine -->
+            <div id="hero-3d-container" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+            <!-- Bottom caption overlay -->
+            <div class="absolute bottom-4 left-4 right-4 z-10 flex items-center justify-between px-4 py-2.5 rounded-2xl bg-base/85 backdrop-blur-md border border-white/10">
+              <div class="flex items-center gap-2.5">
+                <span class="w-2.5 h-2.5 rounded-full bg-legendary"></span>
+                <span class="text-xs font-medium text-ink">5 Creatures inside · Up to 1% Legendary</span>
+              </div>
+              <button onclick="navigateTo('arcade')" class="text-xs font-mono font-semibold text-accent hover:underline cursor-pointer">
+                Enter Arcade →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Scroll indicator -->
+      <a href="#how-it-works" class="absolute bottom-5 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5 text-muted hover:text-ink transition-colors">
+        <span class="font-mono text-[11px] uppercase tracking-widest">Scroll</span>
+        <div class="w-5 h-8 rounded-full border border-white/20 flex justify-center p-1">
+          <div class="w-1 h-2 rounded-full bg-accent animate-bounce"></div>
+        </div>
+      </a>
+    </section>
+
+    <!-- SECTION 2 — HOW IT WORKS (Scroll-Synced Split) -->
+    <section id="how-it-works" class="relative py-24 px-4 sm:px-8 border-t border-white/5">
+      <div class="max-w-6xl mx-auto">
+        <div class="mb-12">
+          <span class="kicker font-mono text-xs uppercase text-muted inline-flex items-center gap-2"><span class="w-1.5 h-1.5 bg-win"></span>How it works</span>
+          <h2 class="font-display font-bold text-3xl sm:text-5xl text-ink mt-2">Four beats. Zero black boxes.</h2>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start">
+          <!-- Left Column: 4 Interactive / Scroll-Synced Steps -->
+          <div class="lg:col-span-6 space-y-4" id="how-steps-list">
+            <!-- Step 1 -->
+            <div onclick="setHowStep(0)" data-step="0" class="how-step-item spot cursor-pointer p-6 rounded-3xl glass-card border-l-4 border-l-accent bg-panel/90 transition-all">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-mono text-xs text-accent font-semibold">STEP 01</span>
+                <span class="font-mono text-xs text-muted">PUBLIC ODDS</span>
+              </div>
+              <h3 class="font-display font-bold text-xl sm:text-2xl text-ink">1. Pick your prize</h3>
+              <p class="text-sm sm:text-[1rem] text-muted mt-1.5 leading-relaxed">
+                Every creature has fixed, public odds read straight from the machine account. Spot a Legendary Gilded Wyrm or go for a high-probability Volt Axolotl.
+              </p>
+            </div>
+
+            <!-- Step 2 -->
+            <div onclick="setHowStep(1)" data-step="1" class="how-step-item spot cursor-pointer p-6 rounded-3xl glass-card border-l-4 border-l-transparent opacity-70 hover:opacity-100 transition-all">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-mono text-xs text-muted font-semibold">STEP 02</span>
+                <span class="font-mono text-xs text-muted">100% SKILL</span>
+              </div>
+              <h3 class="font-display font-bold text-xl sm:text-2xl text-ink">2. Line up the claw</h3>
+              <p class="text-sm sm:text-[1rem] text-muted mt-1.5 leading-relaxed">
+                Aiming is pure skill; you steer. Use the thumb joystick or WASD keys for 15 seconds while the laser dot & targeting ring measure your exact alignment.
+              </p>
+            </div>
+
+            <!-- Step 3 -->
+            <div onclick="setHowStep(2)" data-step="2" class="how-step-item spot cursor-pointer p-6 rounded-3xl glass-card border-l-4 border-l-transparent opacity-70 hover:opacity-100 transition-all">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-mono text-xs text-muted font-semibold">STEP 03</span>
+                <span class="font-mono text-xs text-muted">VERIFIABLE VRF</span>
+              </div>
+              <h3 class="font-display font-bold text-xl sm:text-2xl text-ink">3. The grip rolls</h3>
+              <p class="text-sm sm:text-[1rem] text-muted mt-1.5 leading-relaxed">
+                A verifiable random number decides it. Your alignment sets the grip threshold, and an on-chain VRF proof is rolled against your exact coordinates.
+              </p>
+            </div>
+
+            <!-- Step 4 -->
+            <div onclick="setHowStep(3)" data-step="3" class="how-step-item spot cursor-pointer p-6 rounded-3xl glass-card border-l-4 border-l-transparent opacity-70 hover:opacity-100 transition-all">
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-mono text-xs text-muted font-semibold">STEP 04</span>
+                <span class="font-mono text-xs text-muted">REAL OWNERSHIP</span>
+              </div>
+              <h3 class="font-display font-bold text-xl sm:text-2xl text-ink">4. Win & own</h3>
+              <p class="text-sm sm:text-[1rem] text-muted mt-1.5 leading-relaxed">
+                Wins mint the NFT straight to your wallet. Display it on your shelf or sell it back to the machine pool anytime for instant SOL.
+              </p>
+            </div>
+          </div>
+
+          <!-- Right Column (Sticky): Dynamic Visual Card + 4-dot progress indicator -->
+          <div class="lg:col-span-6 lg:sticky lg:top-28">
+            <div id="how-stage-card" class="spot rounded-[32px] glass-card p-6 sm:p-8 border border-white/10 shadow-glass min-h-[420px] flex flex-col justify-between relative overflow-hidden">
+              <!-- Ambient glow -->
+              <div id="how-visual-glow" class="absolute -top-24 -right-24 w-64 h-64 rounded-full bg-accent/20 blur-3xl pointer-events-none transition-colors duration-500"></div>
+
+              <!-- Dynamic Visual Stage -->
+              <div id="how-visual-stage" class="how-enter flex-1 flex flex-col items-center justify-center text-center py-4">
+                <!-- Populated dynamically by JS -->
+              </div>
+
+              <!-- Bottom 4-dot progress indicator & controls -->
+              <div class="pt-6 border-t border-white/10 flex items-center justify-between">
+                <div class="flex items-center gap-2.5" id="how-dots">
+                  <button onclick="setHowStep(0)" class="w-8 h-2.5 rounded-full bg-accent transition-all cursor-pointer"></button>
+                  <button onclick="setHowStep(1)" class="w-2.5 h-2.5 rounded-full bg-white/20 hover:bg-white/40 transition-all cursor-pointer"></button>
+                  <button onclick="setHowStep(2)" class="w-2.5 h-2.5 rounded-full bg-white/20 hover:bg-white/40 transition-all cursor-pointer"></button>
+                  <button onclick="setHowStep(3)" class="w-2.5 h-2.5 rounded-full bg-white/20 hover:bg-white/40 transition-all cursor-pointer"></button>
+                </div>
+                <span id="how-step-counter" class="font-mono text-xs text-muted">01 / 04</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 3 — PRIZES -->
+    <section id="prizes" class="sec-light relative py-24 px-4 sm:px-10 mx-2 sm:mx-5 rounded-[40px]">
+      <div class="max-w-6xl mx-auto">
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+          <div>
+            <span class="kicker font-mono text-xs uppercase text-[#6B645B] inline-flex items-center gap-2"><span class="w-1.5 h-1.5 bg-[#16A34A]"></span>Machine roster</span>
+            <h2 class="font-display font-bold text-3xl sm:text-5xl text-ink mt-2">Meet the creatures</h2>
+          </div>
+
+          <!-- Rarity Filter Chips -->
+          <div class="flex flex-wrap items-center gap-2" id="prize-filters">
+            <button onclick="filterLandingPrizes('All')" data-filter="All" class="prize-chip px-4 py-2 rounded-full text-xs sm:text-sm font-semibold bg-accent text-white shadow-neon-violet cursor-pointer">All</button>
+            <button onclick="filterLandingPrizes('Legendary')" data-filter="Legendary" class="prize-chip px-4 py-2 rounded-full text-xs sm:text-sm font-semibold bg-panel text-muted hover:text-ink border border-white/10 cursor-pointer flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-legendary"></span>Legendary
+            </button>
+            <button onclick="filterLandingPrizes('Epic')" data-filter="Epic" class="prize-chip px-4 py-2 rounded-full text-xs sm:text-sm font-semibold bg-panel text-muted hover:text-ink border border-white/10 cursor-pointer flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-epic"></span>Epic
+            </button>
+            <button onclick="filterLandingPrizes('Rare')" data-filter="Rare" class="prize-chip px-4 py-2 rounded-full text-xs sm:text-sm font-semibold bg-panel text-muted hover:text-ink border border-white/10 cursor-pointer flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-rare"></span>Rare
+            </button>
+            <button onclick="filterLandingPrizes('Common')" data-filter="Common" class="prize-chip px-4 py-2 rounded-full text-xs sm:text-sm font-semibold bg-panel text-muted hover:text-ink border border-white/10 cursor-pointer flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-common"></span>Common
+            </button>
+          </div>
+        </div>
+
+        <!-- Grid of 5 Creature Cards -->
+        <div id="landing-prizes-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+          <!-- Rendered by JS with custom sticker SVGs -->
+        </div>
+
+        <p class="mt-8 text-center font-mono text-xs sm:text-sm text-muted">
+          Same odds for every play. No house edge, no rigged claws.
+        </p>
+      </div>
+    </section>
+
+    <!-- SECTION 4 — PLAY NOW -->
+    <section id="play-now" class="relative py-28 px-4 sm:px-8 border-t border-white/5">
+      <div class="cta-rect max-w-5xl mx-auto rounded-3xl glass-card p-8 sm:p-12 border border-accent/25 flex flex-col md:flex-row md:items-center md:justify-between gap-8 md:gap-12 relative overflow-hidden">
+        <div class="flex items-start gap-5 text-left md:flex-1 lg:max-w-[27rem] lg:flex-none">
+          <div class="hidden sm:flex w-14 h-14 shrink-0 rounded-2xl bg-accent/15 border border-accent/40 items-center justify-center">
+            <svg class="w-7 h-7 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M12 2v6M9 10l-4 5 2 4M15 10l4 5-2 4M12 10v8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div>
+            <h2 class="font-display font-bold text-3xl sm:text-5xl text-ink">Ready to drop?</h2>
+            <p class="text-muted text-[1rem] sm:text-lg mt-2">Connect your wallet. One credit, one drop, one creature.</p>
+            <p class="mt-3 font-mono text-xs text-muted">Devnet · plays are real, funds are test SOL.</p>
+          </div>
+        </div>
+        <div class="hidden lg:flex absolute right-[290px] bottom-0 items-end pointer-events-none">
+          <canvas data-lottie="monstersCute" class="w-36 h-36 block"></canvas>
+          <canvas data-lottie="monstersFunny" class="w-40 h-40 block -ml-4"></canvas>
+        </div>
+        <button onclick="connectWalletFromLanding()" class="spring-btn md:flex-none md:self-center w-full md:w-auto md:min-w-[250px] px-10 py-4 rounded-xl bg-white hover:bg-[#F3EEE6] text-[#14110F] font-display font-semibold text-lg cursor-pointer">
+          Connect wallet
+        </button>
+      </div>
+    </section>
+
+    <!-- Minimal Footer -->
+    <footer class="py-8 px-4 border-t border-white/5 text-center text-xs font-mono text-muted">
+      CLAW DROP · Provably Fair On-Chain Arcade · Built on Solana Ephemeral Rollups
+    </footer>
+  </div>
+
+
+  <!-- =====================================================================
+       VIEW 2: ARCADE APP (Full-Screen Machine: Attract Mode + Live 15s Play)
+  ===================================================================== -->
+  <div id="view-arcade" class="hidden fixed inset-0 w-full h-full bg-base overflow-hidden select-none">
+
+    <!-- Full-Screen 3D Claw Machine Canvas -->
+    <div id="arcade-3d-container" class="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+    <!-- Subtle radial vignette so floating UI pops cleanly -->
+    <div class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_45%,rgba(11,14,20,0.78)_100%)]"></div>
+
+    <!-- ARCADE TOP BAR (Attract Mode) -->
+    <header id="arcade-topbar" class="relative z-20 flex items-center justify-between px-4 sm:px-7 pt-4 sm:pt-5">
+      <!-- Logo Left -->
+      <button onclick="navigateTo('landing')" class="flex items-center gap-2.5 px-3.5 py-2 rounded-full glass-panel hover:border-white/20 transition-colors cursor-pointer">
+        <div class="w-7 h-7 rounded-xl bg-accent/20 border border-accent/40 flex items-center justify-center">
+          <svg class="w-4 h-4 text-accent" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+            <path d="M12 2v5M10 10.5L6 15l2.5 4.5M14 10.5L18 15l-2.5 4.5M12 11v7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <span class="font-display font-bold text-[1rem] sm:text-lg tracking-tight text-ink">CLAW<span class="text-accent">DROP</span></span>
+      </button>
+
+      <!-- Right: Devnet Badge + Wallet Chip -->
+      <div class="flex items-center gap-2.5 relative">
+        <span class="px-3 py-1.5 rounded-full bg-win/15 border border-win/35 text-win font-mono text-xs font-semibold">
+          Devnet
+        </span>
+
+        <!-- Wallet Chip Button -->
+        <button id="wallet-chip-btn" onclick="handleWalletChipClick()" class="spring-btn flex items-center gap-2.5 px-4 py-2 rounded-full glass-panel hover:border-accent/50 text-sm font-medium cursor-pointer">
+          <span id="wallet-chip-dot" class="w-2 h-2 rounded-full bg-win"></span>
+          <span id="wallet-chip-label" class="font-mono text-xs sm:text-sm text-ink">7xKp…9vQ2</span>
+          <span id="wallet-chip-bal" class="hidden sm:inline font-mono text-xs text-muted border-l border-white/10 pl-2.5">1.25 SOL</span>
+        </button>
+
+        <!-- WALLET MENU POPOVER (Section 3.3) -->
+        <div id="wallet-popover" class="hidden absolute right-0 top-14 w-72 rounded-3xl glass-card p-5 border border-white/15 shadow-glass z-40">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-mono uppercase tracking-wider text-muted" id="wallet-provider-label">Phantom · Devnet</span>
+            <button onclick="closeWalletPopover()" class="text-muted hover:text-ink text-sm cursor-pointer">✕</button>
+          </div>
+
+          <!-- Truncated Address (Tap to copy) -->
+          <button onclick="copyWalletAddress()" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-base/80 hover:bg-base border border-white/10 transition-colors cursor-pointer group">
+            <span class="font-mono text-xs text-ink" id="wallet-full-trunc">7xKp9mR4…3wL89vQ2</span>
+            <span class="font-mono text-[11px] text-accent group-hover:underline">Copy</span>
+          </button>
+
+          <!-- Large SOL Balance -->
+          <div class="my-4 px-1">
+            <div class="text-xs text-muted">Available balance</div>
+            <div class="font-display font-bold text-3xl text-ink mt-0.5">
+              <span id="wallet-popover-balance">1.25</span> <span class="text-[1rem] font-mono text-muted">SOL</span>
+            </div>
+          </div>
+
+          <!-- Fund for testing button + inline progress -->
+          <button id="fund-testing-btn" onclick="fundForTesting()" class="spring-btn w-full py-2.5 px-4 rounded-full bg-accent/20 hover:bg-accent/30 border border-accent/40 text-accent font-semibold text-sm flex items-center justify-center gap-2 cursor-pointer">
+            <span>Fund for testing (+1.0 SOL)</span>
+          </button>
+          <div id="fund-progress-box" class="hidden w-full py-2.5 px-4 rounded-2xl bg-base/80 border border-white/10 text-xs font-mono text-muted flex items-center justify-center gap-2">
+            <span class="w-3.5 h-3.5 rounded-full border-2 border-accent border-t-transparent animate-spin"></span>
+            <span>Requesting Devnet airdrop…</span>
+          </div>
+
+          <div class="mt-4 pt-3 border-t border-white/10 flex items-center justify-between text-xs font-medium">
+            <button onclick="showToast('Opened wallet account on Solana Explorer', '6x9f...e41a')" class="text-link hover:underline cursor-pointer">
+              View on explorer ↗
+            </button>
+            <button onclick="disconnectWallet()" class="text-alert hover:underline cursor-pointer">
+              Disconnect
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- PLAY HUD TOP BAR (Section 3.5 — Visible only during active 15s Play round) -->
+    <div id="play-hud-top" class="hidden relative z-20 flex items-center justify-between px-4 sm:px-7 pt-4">
+      <!-- Live Rollup Telemetry Counters -->
+      <div class="flex items-center gap-2 sm:gap-3 px-3.5 py-2 rounded-full glass-panel font-mono text-xs">
+        <div class="flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-win animate-pulse"></span>
+          <span class="text-muted">TX sent</span>
+          <span id="hud-tx-count" class="text-ink font-bold">1</span>
+        </div>
+        <span class="text-white/15">|</span>
+        <div>
+          <span class="text-muted">Fees</span>
+          <span class="text-win font-bold ml-1">0</span>
+        </div>
+        <span class="hidden sm:inline text-white/15">|</span>
+        <div class="hidden sm:block">
+          <span class="text-muted">avg latency</span>
+          <span id="hud-latency" class="text-ink font-bold ml-1">16ms</span>
+        </div>
+      </div>
+
+      <!-- 15s Circular Timer Ring (Top Right) -->
+      <div class="relative w-14 h-14 flex items-center justify-center rounded-full glass-panel shadow-glass">
+        <svg class="w-12 h-12 -rotate-90" viewBox="0 0 48 48">
+          <circle cx="24" cy="24" r="20" stroke="rgba(255,255,255,0.12)" stroke-width="3.5" fill="none" />
+          <circle id="timer-ring-circle" cx="24" cy="24" r="20" stroke="#A855F7" stroke-width="3.5" stroke-linecap="round" fill="none"
+                  stroke-dasharray="125.66" stroke-dashoffset="0" />
+        </svg>
+        <span id="timer-ring-text" class="absolute font-mono font-bold text-xs text-ink">15s</span>
+      </div>
+    </div>
+
+    <!-- LIVE TARGETING CALLOUT OVERLAY (Floating dynamic pill over machine during Play) -->
+    <div id="play-target-callout" class="hidden pointer-events-none absolute top-24 left-1/2 -translate-x-1/2 z-20 transition-all duration-150">
+      <div id="target-pill-box" class="px-4 py-2 rounded-full glass-panel border border-white/20 shadow-glass flex items-center gap-2.5">
+        <span id="target-rarity-dot" class="w-2.5 h-2.5 rounded-full bg-epic"></span>
+        <span id="target-creature-name" class="text-xs font-semibold text-ink">Void Hopper</span>
+        <span class="text-white/20">·</span>
+        <span id="target-grip-mono" class="font-mono text-xs font-bold text-epic">Epic · 9%</span>
+      </div>
+    </div>
+
+    <!-- INLINE CONTEXTUAL ERROR / EDGE STATE BANNER (Section 3.10) -->
+    <div id="arcade-edge-banner" class="hidden absolute top-20 left-1/2 -translate-x-1/2 z-30 w-[92%] max-w-md">
+      <div class="px-4 py-3 rounded-2xl glass-card border border-alert/50 shadow-neon-alert flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-alert shrink-0"></span>
+          <span id="edge-banner-msg" class="text-xs sm:text-sm font-medium text-ink">You need 0.05 SOL to play.</span>
+        </div>
+        <button id="edge-banner-action" onclick="handleEdgeBannerAction()" class="px-3.5 py-1.5 rounded-full bg-alert text-[1rem] font-display font-bold text-xs shrink-0 cursor-pointer">
+          Fund
+        </button>
+      </div>
+    </div>
+
+    <!-- ARCADE BOTTOM CONTROLS (Attract Mode — Section 3.2) -->
+    <div id="arcade-bottom-attract" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-3.5 w-full px-4">
+      <div class="px-3 py-1 rounded-full bg-base/75 border border-white/10 font-mono text-[11px] text-muted">
+        Drag to orbit · Attract mode active
+      </div>
+
+      <!-- Primary Pill CTA -->
+      <button id="arcade-primary-cta" onclick="handleArcadePrimaryCTA()" class="spring-btn px-8 py-4 rounded-full bg-accent hover:bg-purple-500 text-white font-display font-bold text-lg sm:text-xl shadow-neon-violet flex items-center gap-3 cursor-pointer">
+        <span id="arcade-cta-text">Insert credit · 0.05 SOL</span>
+      </button>
+
+      <!-- Small text links: Odds · Collection · Fairness -->
+      <div class="flex items-center gap-4 text-xs sm:text-sm font-medium text-muted">
+        <button onclick="openOddsModal()" class="hover:text-ink transition-colors cursor-pointer">Odds</button>
+        <span class="text-white/20">·</span>
+        <button onclick="navigateTo('collection')" class="hover:text-ink transition-colors cursor-pointer">
+          Collection <span id="arcade-shelf-badge" class="font-mono text-[11px] text-accent ml-0.5">(0/5)</span>
+        </button>
+        <span class="text-white/20">·</span>
+        <button onclick="navigateTo('fairness')" class="hover:text-ink transition-colors cursor-pointer">Fairness</button>
+      </div>
+    </div>
+
+    <!-- PLAY HUD BOTTOM CONTROLS (Thumb Joystick Left + Big DROP Button Right — Section 3.5) -->
+    <div id="play-hud-bottom" class="hidden absolute bottom-6 left-0 right-0 z-20 px-6 sm:px-10 flex items-end justify-between pointer-events-none">
+      <!-- Bottom-Left: Tactile Thumb Joystick -->
+      <div class="pointer-events-auto flex flex-col items-center gap-2">
+        <div id="joystick-base" class="relative w-28 h-28 sm:w-32 sm:h-32 rounded-full glass-panel border-2 border-white/15 shadow-glass flex items-center justify-center touch-none cursor-grab active:cursor-grabbing">
+          <!-- Crosshair ticks -->
+          <div class="absolute inset-3 rounded-full border border-dashed border-white/10 pointer-events-none"></div>
+          <div class="w-1.5 h-1.5 rounded-full bg-white/25 pointer-events-none"></div>
+          <!-- Movable Stick Knob -->
+          <div id="joystick-knob" class="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-b from-slate-600 to-slate-800 border-2 border-accent shadow-neon-violet flex items-center justify-center transition-transform duration-75">
+            <div class="w-4 h-4 rounded-full bg-accent/80"></div>
+          </div>
+        </div>
+        <span class="font-mono text-[11px] text-muted bg-base/75 px-2.5 py-0.5 rounded-full">Steer · WASD / Drag</span>
+      </div>
+
+      <!-- Bottom-Right: Big Red DROP Button -->
+      <div class="pointer-events-auto flex flex-col items-center gap-2">
+        <button id="drop-claw-btn" onclick="triggerClawDrop()" class="drop-btn w-24 h-24 sm:w-28 sm:h-28 rounded-full font-display font-bold text-xl sm:text-2xl tracking-wide text-white flex items-center justify-center cursor-pointer">
+          DROP
+        </button>
+        <span class="font-mono text-[11px] text-muted bg-base/75 px-2.5 py-0.5 rounded-full">Spacebar</span>
+      </div>
+    </div>
+
+    <!-- ===================================================================
+         CREDIT BOTTOM SHEET (Section 3.4 — Over dimmed machine)
+    =================================================================== -->
+    <div id="credit-sheet-backdrop" class="hidden fixed inset-0 z-30 bg-black/65 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div id="credit-sheet-card" class="spring-sheet w-full max-w-md rounded-t-[32px] sm:rounded-[32px] glass-card p-6 sm:p-7 border border-white/15 shadow-glass">
+        <!-- Drag Handle -->
+        <div class="w-10 h-1.5 rounded-full bg-white/20 mx-auto mb-5"></div>
+
+        <!-- Normal Approval State -->
+        <div id="credit-sheet-content">
+          <div class="flex items-baseline justify-between">
+            <h3 class="font-display font-bold text-2xl text-ink">One credit</h3>
+            <span class="font-display font-bold text-2xl text-accent">0.05 SOL</span>
+          </div>
+
+          <div class="mt-1 flex items-center justify-between text-xs font-mono text-muted">
+            <span>15s live rollup session</span>
+            <span>Your balance: <strong id="sheet-balance-val" class="text-ink">1.25 SOL</strong></span>
+          </div>
+
+          <!-- "Exactly what the one approval does" box -->
+          <div class="mt-5 p-4 rounded-2xl bg-base/85 border border-white/10">
+            <div class="text-xs font-semibold text-ink mb-1">Exactly what the one approval does</div>
+            <p class="text-xs text-muted leading-relaxed">
+              Pays for your drop (<span class="font-mono text-ink">0.05 SOL</span>), covers the rollup fee (<span class="font-mono text-win">0.00 SOL</span>), one approval and nothing else.
+            </p>
+          </div>
+
+          <!-- Inline Low Balance Warning & Fund Button -->
+          <div id="sheet-low-balance-box" class="hidden mt-4 p-3.5 rounded-2xl bg-alert/15 border border-alert/40 flex items-center justify-between gap-3">
+            <span class="text-xs font-medium text-ink">You need 0.05 SOL to play.</span>
+            <button onclick="fundForTesting(true)" class="px-3.5 py-1.5 rounded-full bg-alert text-[1rem] font-display font-bold text-xs cursor-pointer">
+              Fund for testing
+            </button>
+          </div>
+
+          <!-- Inline Rejected / Error State -->
+          <div id="sheet-error-box" class="hidden mt-4 p-3.5 rounded-2xl bg-alert/15 border border-alert/40 flex items-center justify-between gap-3">
+            <span id="sheet-error-text" class="text-xs font-medium text-ink">You cancelled the approval.</span>
+            <button onclick="approveAndPlay()" class="px-3.5 py-1.5 rounded-full bg-alert text-[1rem] font-display font-bold text-xs cursor-pointer">
+              Retry
+            </button>
+          </div>
+
+          <div class="mt-6 flex items-center gap-3">
+            <button onclick="closeCreditSheet()" class="px-5 py-3.5 rounded-full bg-panel hover:bg-panelHover border border-white/10 text-sm font-semibold text-muted hover:text-ink cursor-pointer">
+              Cancel
+            </button>
+            <button id="approve-play-btn" onclick="approveAndPlay()" class="spring-btn flex-1 py-3.5 rounded-full bg-accent hover:bg-purple-500 text-white font-display font-bold text-[1rem] shadow-neon-violet cursor-pointer">
+              Approve & play
+            </button>
+          </div>
+        </div>
+
+        <!-- Transition State: Handing game to rollup -->
+        <div id="credit-sheet-handoff" class="hidden py-10 text-center space-y-4">
+          <div class="w-12 h-12 rounded-full border-4 border-accent border-t-transparent animate-spin mx-auto"></div>
+          <div class="font-display font-bold text-xl text-ink">Handing your game to the rollup…</div>
+          <div class="font-mono text-xs text-muted">Delegated session · 0.00 SOL gas</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================================================================
+         REVEAL & CLAIM MODAL OVERLAY (Sections 3.6 & 3.7)
+    =================================================================== -->
+    <div id="reveal-overlay" class="hidden fixed inset-0 z-30 bg-black/70 backdrop-blur-md flex items-center justify-center p-4">
+
+      <!-- Phase 1: Verifying Randomness -->
+      <div id="reveal-verifying-box" class="w-full max-w-sm rounded-[32px] glass-card p-8 border border-accent/40 text-center shadow-neon-violet space-y-4">
+        <div class="w-14 h-14 rounded-full border-4 border-accent border-t-transparent animate-spin mx-auto"></div>
+        <h3 id="reveal-verify-title" class="font-display font-bold text-2xl text-ink">Verifying randomness…</h3>
+        <div class="px-3.5 py-2 rounded-xl bg-base/90 border border-white/10 font-mono text-xs text-accent">
+          grip = VRF(tx) vs your odds
+        </div>
+        <p id="reveal-verify-sub" class="text-xs text-muted">Reading verifiable VRF output from Solana devnet</p>
+      </div>
+
+      <!-- Phase 2: Result Card (Win or Miss) -->
+      <div id="reveal-result-card" class="hidden w-full max-w-sm rounded-[32px] glass-card overflow-hidden border-t-4 border-t-epic shadow-glass">
+        <div class="p-6 sm:p-7 text-center">
+          <!-- Status Pill -->
+          <div id="reveal-status-badge" class="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-win/15 border border-win/40 text-win font-mono text-xs font-bold mb-4">
+            <span>✦ CAUGHT!</span>
+          </div>
+
+          <!-- Creature Sticker Art -->
+          <div id="reveal-creature-art" class="w-52 h-52 mx-auto -my-1 flex items-center justify-center"></div>
+
+          <h3 id="reveal-creature-name" class="font-display font-bold text-2xl sm:text-3xl text-ink mt-2">Void Hopper</h3>
+          <div id="reveal-rarity-tag" class="font-mono text-xs font-semibold text-epic mt-0.5">Epic · 9% base</div>
+
+          <!-- Verifiable VRF Roll Proof Box -->
+          <div class="mt-5 p-4 rounded-2xl bg-base/90 border border-white/10 space-y-2 text-left">
+            <div class="flex items-center justify-between font-mono text-xs">
+              <span class="text-muted">grip chance</span>
+              <span id="reveal-grip-val" class="text-ink font-bold">11.4%</span>
+            </div>
+            <div class="flex items-center justify-between font-mono text-xs">
+              <span class="text-muted">VRF roll</span>
+              <span id="reveal-roll-compare" class="text-win font-bold">roll 0.041 &lt; 0.114</span>
+            </div>
+            <div class="pt-2 border-t border-white/10 flex items-center justify-between font-mono text-[11px]">
+              <span id="reveal-tx-hash" class="text-muted">tx: 5vN8...k92P</span>
+              <button onclick="inspectCurrentRevealInFairness()" class="text-link hover:underline cursor-pointer">
+                Verify on-chain ↗
+              </button>
+            </div>
+          </div>
+
+          <!-- Win Action: Claim to wallet -->
+          <div id="reveal-win-actions" class="mt-6 space-y-2.5">
+            <button onclick="openClaimStep()" class="spring-btn w-full py-4 rounded-full bg-win hover:bg-emerald-400 text-[1rem] font-display font-bold text-lg shadow-neon-win cursor-pointer">
+              Claim to wallet
+            </button>
+          </div>
+
+          <!-- Miss Action: Play again -->
+          <div id="reveal-miss-actions" class="hidden mt-6 space-y-2.5">
+            <button onclick="resetToAttractAndPlayAgain()" class="spring-btn w-full py-4 rounded-full bg-accent hover:bg-purple-500 text-white font-display font-bold text-lg shadow-neon-violet cursor-pointer">
+              Play again
+            </button>
+            <button onclick="closeRevealToAttract()" class="w-full py-2 text-xs font-medium text-muted hover:text-ink cursor-pointer">
+              Back to machine
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase 3: One-Step Claim Confirmation & Keep / Sell Back Choice (Section 3.7) -->
+      <div id="reveal-claim-card" class="hidden w-full max-w-sm rounded-[32px] glass-card p-6 sm:p-7 border border-win/40 shadow-neon-win text-center space-y-4">
+        <div id="claim-step-approve">
+          <div class="w-12 h-12 rounded-2xl bg-win/20 border border-win/40 text-win flex items-center justify-center mx-auto mb-3 font-bold text-xl">✓</div>
+          <h3 class="font-display font-bold text-2xl text-ink">Claim your NFT</h3>
+          <p class="text-xs text-muted mt-1 leading-relaxed">
+            One approval transfers the minted creature token from the rollup vault straight into your wallet.
+          </p>
+          <button onclick="confirmClaimTransfer()" class="spring-btn mt-5 w-full py-3.5 rounded-full bg-win hover:bg-emerald-400 text-base font-display font-bold text-base shadow-neon-win cursor-pointer">
+            Approve transfer
+          </button>
+        </div>
+
+        <div id="claim-step-choice" class="hidden space-y-4">
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-win/15 text-win font-mono text-xs font-bold">
+            ✓ Minted to wallet
+          </div>
+          <h3 class="font-display font-bold text-2xl text-ink">Keep or sell back?</h3>
+          <p class="text-xs text-muted">
+            Display <strong id="claim-creature-label" class="text-ink">Void Hopper</strong> on your shelf or sell it back to the instant liquidity pool.
+          </p>
+
+          <div class="grid grid-cols-1 gap-2.5 pt-2">
+            <button onclick="keepClaimedCreature()" class="spring-btn w-full py-3.5 rounded-full bg-accent hover:bg-purple-500 text-white font-display font-bold text-[1rem] shadow-neon-violet cursor-pointer">
+              Keep in Collection
+            </button>
+            <button onclick="sellBackClaimedCreature()" class="spring-btn w-full py-3.5 rounded-full bg-panel hover:bg-panelHover border border-white/15 text-ink font-display font-semibold text-sm cursor-pointer">
+              Sell back for <span id="claim-sellback-price" class="font-mono text-win">0.12 SOL</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ===================================================================
+         ODDS QUICK MODAL (Opened from Arcade "Odds" link)
+    =================================================================== -->
+    <div id="odds-modal" class="hidden fixed inset-0 z-30 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="w-full max-w-md rounded-[32px] glass-card p-6 border border-white/15 shadow-glass">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-display font-bold text-xl text-ink">Machine Odds</h3>
+          <button onclick="closeOddsModal()" class="w-8 h-8 rounded-full bg-panel text-muted hover:text-ink flex items-center justify-center cursor-pointer">✕</button>
+        </div>
+        <div id="arcade-odds-list" class="space-y-2.5"></div>
+        <p class="mt-4 font-mono text-[11px] text-muted text-center">
+          Centering the claw boosts effective grip up to 1.35× base rarity.
+        </p>
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- =====================================================================
+       VIEW 3: COLLECTION ("Your shelf" — Section 3.8)
+  ===================================================================== -->
+  <div id="view-collection" class="hidden min-h-screen w-full arcade-grid pt-20 pb-16 px-4 sm:px-8">
+    <div class="max-w-5xl mx-auto">
+      <!-- Top Bar -->
+      <div class="flex flex-wrap items-center justify-between gap-4 mb-8">
+        <div>
+          <button onclick="navigateTo('arcade')" class="text-xs font-mono text-accent hover:underline mb-2 inline-block cursor-pointer">
+            ← Back to Arcade
+          </button>
+          <h1 class="font-display font-bold text-3xl sm:text-5xl text-ink flex items-center gap-2">Your shelf <canvas data-lottie="monstersCute" style="width:5rem;height:5rem;min-width:5rem" class="-my-3 block shrink-0"></canvas></h1>
+          <p class="font-mono text-sm text-muted mt-1">
+            <span id="shelf-collected-count" class="text-accent font-bold">0</span> of 5 creatures collected
+          </p>
+        </div>
+
+        <button onclick="navigateTo('arcade')" class="spring-btn px-6 py-3 rounded-full bg-accent hover:bg-purple-500 text-white font-display font-semibold text-sm shadow-neon-violet cursor-pointer">
+          Play to fill your shelf
+        </button>
+      </div>
+
+      <!-- Empty State Banner (Visible when 0 creatures owned) -->
+      <div id="shelf-empty-banner" class="mb-8 p-8 rounded-[32px] glass-card border border-white/10 text-center space-y-4">
+        <div class="text-3xl">🕹️</div>
+        <h3 class="font-display font-bold text-2xl text-ink">Your shelf is empty. Go play.</h3>
+        <p class="text-sm text-muted max-w-md mx-auto">
+          Catch any of the 5 creatures in the arcade machine to mint them directly into your Solana wallet.
+        </p>
+        <button onclick="navigateTo('arcade')" class="spring-btn px-7 py-3.5 rounded-full bg-accent hover:bg-purple-500 text-white font-display font-bold text-sm shadow-neon-violet cursor-pointer">
+          Play to fill your shelf
+        </button>
+      </div>
+
+      <!-- 5 Prize Slots Grid -->
+      <div id="collection-slots-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+        <!-- Rendered dynamically by JS -->
+      </div>
+    </div>
+  </div>
+
+
+  <!-- =====================================================================
+       VIEW 4: FAIRNESS (Public Audit Page — Section 3.9)
+  ===================================================================== -->
+  <div id="view-fairness" class="hidden min-h-screen w-full arcade-grid pt-20 pb-16 px-4 sm:px-8">
+    <div class="max-w-4xl mx-auto space-y-8">
+      <!-- Header -->
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <button onclick="navigateTo('arcade')" class="text-xs font-mono text-accent hover:underline mb-2 inline-block cursor-pointer">
+            ← Back to Arcade
+          </button>
+          <h1 class="font-display font-bold text-3xl sm:text-5xl text-ink">Anyone can audit every play.</h1>
+          <p class="text-ink/80 text-[1rem] sm:text-lg mt-3 relative z-10">
+            Nothing about fairness is a promise; it's an on-chain cryptographic proof.
+          </p>
+        </div>
+      </div>
+
+      <!-- 2-Column Explainer Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Grip Formula -->
+        <div class="p-6 rounded-[28px] glass-card border border-white/10 space-y-3">
+          <span class="font-mono text-xs text-accent uppercase tracking-wider">Grip Formula</span>
+          <h3 class="font-display font-bold text-xl text-ink">Skill moves the odds; it never breaks them.</h3>
+          <p class="text-sm text-muted leading-relaxed">
+            Grip chance = prize rarity × how well you're lined up. Dead-center alignment grants up to a <span class="font-mono text-ink">1.35×</span> precision multiplier on the base rarity.
+          </p>
+          <div class="p-3 rounded-xl bg-base/90 border border-white/10 font-mono text-xs text-win">
+            effective_grip = base_odds × alignment(0.50..1.35)
+          </div>
+        </div>
+
+        <!-- Verifiable Randomness -->
+        <div class="p-6 rounded-[28px] glass-card border border-white/10 space-y-3">
+          <span class="font-mono text-xs text-link uppercase tracking-wider">Verifiable Randomness</span>
+          <h3 class="font-display font-bold text-xl text-ink">Public VRF reel tied to your TX</h3>
+          <p class="text-sm text-muted leading-relaxed">
+            Every drop requests a Verifiable Random Function (VRF) output normalized to <span class="font-mono text-ink">[0.000, 1.000)</span>. If <span class="font-mono text-win">roll &lt; grip</span>, the claw holds.
+          </p>
+          <div class="p-3 rounded-xl bg-base/90 border border-white/10 font-mono text-xs text-accent">
+            grip 9.0% · roll 0.041 &lt; 0.090 → WIN
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Odds Table Read From Machine Account -->
+      <div class="p-6 sm:p-8 rounded-[32px] glass-card border border-white/10">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-display font-bold text-xl text-ink">Live Machine Account Odds</h3>
+          <span class="font-mono text-xs text-win flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-win animate-pulse"></span> Account: CLAW7x...99mP
+          </span>
+        </div>
+        <div id="fairness-odds-table" class="divide-y divide-white/10">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+
+      <!-- Transaction Lookup Box -->
+      <div class="p-6 sm:p-8 rounded-[32px] glass-card border border-accent/30 shadow-neon-violet space-y-4">
+        <h3 class="font-display font-bold text-xl text-ink">Audit a Play Transaction</h3>
+        <p class="text-xs sm:text-sm text-muted">
+          Paste any play transaction signature or click a recent roll below to verify the VRF proof.
+        </p>
+
+        <div class="flex flex-col sm:flex-row gap-3">
+          <input id="tx-lookup-input" type="text" value="5vN8xR2mQ9pL4wK7zB3cT1yH6jF8dG2sA9k92P"
+                 class="flex-1 px-4 py-3 rounded-2xl bg-base border border-white/15 font-mono text-xs text-ink focus:outline-none focus:border-accent"
+                 placeholder="Paste Solana play TX signature..." />
+          <button onclick="lookupTransaction()" class="spring-btn px-6 py-3 rounded-2xl bg-accent hover:bg-purple-500 text-white font-display font-bold text-sm cursor-pointer">
+            Audit TX
+          </button>
+        </div>
+
+        <!-- Sample clickable recent TX chips -->
+        <div id="recent-tx-chips" class="flex flex-wrap items-center gap-2 text-xs font-mono">
+          <span class="text-muted">Recent:</span>
+        </div>
+
+        <!-- Audited Result Output -->
+        <div id="tx-lookup-result" class="p-4 rounded-2xl bg-base/90 border border-white/10 font-mono text-xs space-y-2">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- =====================================================================
+       TOAST NOTIFICATION WITH TX LINK (Global component)
+  ===================================================================== -->
+  <div id="global-toast" class="hidden fixed bottom-6 right-6 z-50 max-w-sm rounded-2xl glass-card px-4 py-3.5 border border-win/40 shadow-neon-win flex items-center gap-3">
+    <span class="w-2.5 h-2.5 rounded-full bg-win shrink-0"></span>
+    <div class="text-xs">
+      <div id="toast-message" class="font-medium text-ink">Copied to clipboard</div>
+      <div id="toast-tx-row" class="hidden font-mono text-[11px] text-link mt-0.5">TX: 8mQ4...7xLp ↗</div>
+    </div>
+  </div>
+
+
+  <!-- =====================================================================
+       QA / EDGE STATES TESTER PILL (Section 3.10 — Inspect all 6 error states)
+  ===================================================================== -->
+  <div class="fixed bottom-4 left-4 z-50">
+    <button onclick="toggleQaMenu()" class="px-3 py-1.5 rounded-full glass-panel border border-white/15 font-mono text-[11px] text-muted hover:text-ink shadow-glass flex items-center gap-1.5 cursor-pointer">
+      <span class="w-2 h-2 rounded-full bg-accent"></span>
+      <span>QA States</span>
+    </button>
+
+    <div id="qa-menu-popover" class="hidden absolute bottom-10 left-0 w-64 rounded-2xl glass-card p-3.5 border border-white/15 shadow-glass space-y-1.5 text-xs">
+      <div class="font-mono text-[10px] uppercase tracking-wider text-muted px-2 pb-1 border-b border-white/10">
+        Simulate Edge & Error States
+      </div>
+      <button onclick="triggerQaState('no-wallet')" class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-ink cursor-pointer">1. No wallet connected</button>
+      <button onclick="triggerQaState('rejected')" class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-ink cursor-pointer">2. Rejected approval</button>
+      <button onclick="triggerQaState('low-balance')" class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-ink cursor-pointer">3. Low balance (&lt;0.05 SOL)</button>
+      <button onclick="triggerQaState('network-down')" class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-ink cursor-pointer">4. Network / Rollup down</button>
+      <button onclick="triggerQaState('slow-vrf')" class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-ink cursor-pointer">5. Slow randomness VRF</button>
+      <button onclick="triggerQaState('sold-out')" class="w-full text-left px-2.5 py-1.5 rounded-xl hover:bg-white/10 text-ink cursor-pointer">6. Prize sold out</button>
+      <button onclick="triggerQaState('reset')" class="w-full text-left px-2.5 py-1.5 rounded-xl bg-accent/20 text-accent font-semibold mt-1 cursor-pointer">↺ Reset Healthy State</button>
+    </div>
+  </div>
+
+
+  <!-- =====================================================================
+       APPLICATION LOGIC, CREATURE STICKER SVG FACTORY & 3D CLAW ENGINE
+  ===================================================================== -->
+  <script>
+    /* -----------------------------------------------------------------------
+       1. CREATURE ROSTER & HIGH-CRAFT BOLD-OUTLINE STICKER SVG ART
+       Inspired by vibrant comic character trading cards with thick outlines
+    ----------------------------------------------------------------------- */
+    const CREATURES = [
+      {
+        id: 'gilded-wyrm',
+        name: 'Gilded Wyrm',
+        rarity: 'Legendary',
+        color: '#F5B301',
+        odds: 0.01,
+        oddsLabel: '1%',
+        sellBack: 0.45,
+        tag: 'n°001',
+        vibe: 'Cosmic Crown Dragon',
+        svg: `
+          <svg viewBox="0 0 160 160" class="w-full h-full sticker-outline" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="gw-bg" cx="50%" cy="40%" r="60%">
+                <stop offset="0%" stop-color="#FFF3B0"/>
+                <stop offset="100%" stop-color="#F5B301"/>
+              </radialGradient>
+            </defs>
+            <!-- Sticker White/Gold Backing -->
+            <circle cx="80" cy="84" r="62" fill="url(#gw-bg)" stroke="#0B0E14" stroke-width="6"/>
+            <!-- Floating Stars -->
+            <path d="M26 42l3 7 7 3-7 3-3 7-3-7-7-3 7-3z" fill="#FFF" stroke="#0B0E14" stroke-width="2.5"/>
+            <path d="M134 48l2.5 5.5 5.5 2.5-5.5 2.5-2.5 5.5-2.5-5.5-5.5-2.5 5.5-2.5z" fill="#FFF" stroke="#0B0E14" stroke-width="2.5"/>
+            <!-- Dragon Wings -->
+            <path d="M36 86 C16 68, 18 46, 44 62 Z" fill="#FB923C" stroke="#0B0E14" stroke-width="4.5" stroke-linejoin="round"/>
+            <path d="M124 86 C144 68, 142 46, 116 62 Z" fill="#FB923C" stroke="#0B0E14" stroke-width="4.5" stroke-linejoin="round"/>
+            <!-- Chubby Dragon Body -->
+            <ellipse cx="80" cy="96" rx="38" ry="34" fill="#FBBF24" stroke="#0B0E14" stroke-width="5"/>
+            <ellipse cx="80" cy="102" rx="22" ry="20" fill="#FEF08A" stroke="#0B0E14" stroke-width="3.5"/>
+            <!-- Head -->
+            <circle cx="80" cy="64" r="28" fill="#FBBF24" stroke="#0B0E14" stroke-width="5"/>
+            <!-- Royal Crown -->
+            <path d="M61 40 L65 23 L74 34 L80 20 L86 34 L95 23 L99 40 Z" fill="#A855F7" stroke="#0B0E14" stroke-width="4" stroke-linejoin="round"/>
+            <!-- Expressive Half-Lid Cool Eyes -->
+            <ellipse cx="69" cy="62" rx="7" ry="6" fill="#FFF" stroke="#0B0E14" stroke-width="3.5"/>
+            <circle cx="70" cy="63" r="3" fill="#0B0E14"/>
+            <path d="M61 59h16" stroke="#0B0E14" stroke-width="4" stroke-linecap="round"/>
+            <ellipse cx="91" cy="62" rx="7" ry="6" fill="#FFF" stroke="#0B0E14" stroke-width="3.5"/>
+            <circle cx="90" cy="63" r="3" fill="#0B0E14"/>
+            <path d="M83 59h16" stroke="#0B0E14" stroke-width="4" stroke-linecap="round"/>
+            <!-- Snout & Cheeky Fang -->
+            <path d="M72 74 Q80 80 88 74" fill="none" stroke="#0B0E14" stroke-width="3.5" stroke-linecap="round"/>
+            <path d="M84 75 L86 80 L89 74" fill="#FFF" stroke="#0B0E14" stroke-width="2.5" stroke-linejoin="round"/>
+            <!-- Feet -->
+            <ellipse cx="62" cy="126" rx="11" ry="7" fill="#F59E0B" stroke="#0B0E14" stroke-width="4"/>
+            <ellipse cx="98" cy="126" rx="11" ry="7" fill="#F59E0B" stroke="#0B0E14" stroke-width="4"/>
+          </svg>
+        `
+      },
+      {
+        id: 'void-hopper',
+        name: 'Void Hopper',
+        rarity: 'Epic',
+        color: '#A855F7',
+        odds: 0.09,
+        oddsLabel: '9%',
+        sellBack: 0.14,
+        tag: 'n°002',
+        vibe: 'Street Visor Bunny',
+        svg: `
+          <svg viewBox="0 0 160 160" class="w-full h-full sticker-outline" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="80" cy="86" r="60" fill="#2E1065" stroke="#0B0E14" stroke-width="6"/>
+            <!-- Tall Bunny Ears -->
+            <rect x="54" y="18" width="16" height="44" rx="8" transform="rotate(-10 62 40)" fill="#C084FC" stroke="#0B0E14" stroke-width="4.5"/>
+            <rect x="90" y="18" width="16" height="44" rx="8" transform="rotate(10 98 40)" fill="#C084FC" stroke="#0B0E14" stroke-width="4.5"/>
+            <!-- Hoodie Body -->
+            <path d="M46 126 C46 96, 114 96, 114 126 Z" fill="#7E22CE" stroke="#0B0E14" stroke-width="5" stroke-linejoin="round"/>
+            <!-- Head -->
+            <ellipse cx="80" cy="76" rx="32" ry="27" fill="#D8B4FE" stroke="#0B0E14" stroke-width="5"/>
+            <!-- Neon Cyber Visor -->
+            <rect x="50" y="64" width="60" height="17" rx="8.5" fill="#34D399" stroke="#0B0E14" stroke-width="4"/>
+            <path d="M58 69 L72 76" stroke="#FFF" stroke-width="3" stroke-linecap="round"/>
+            <!-- Headphones -->
+            <rect x="40" y="64" width="10" height="24" rx="5" fill="#F5B301" stroke="#0B0E14" stroke-width="4"/>
+            <rect x="110" y="64" width="10" height="24" rx="5" fill="#F5B301" stroke="#0B0E14" stroke-width="4"/>
+            <!-- Smirk -->
+            <path d="M73 90 Q81 95 88 88" fill="none" stroke="#0B0E14" stroke-width="3.5" stroke-linecap="round"/>
+          </svg>
+        `
+      },
+      {
+        id: 'volt-axolotl',
+        name: 'Volt Axolotl',
+        rarity: 'Rare',
+        color: '#3B82F6',
+        odds: 0.25,
+        oddsLabel: '25%',
+        sellBack: 0.06,
+        tag: 'n°003',
+        vibe: 'Skater Spark Salamander',
+        svg: `
+          <svg viewBox="0 0 160 160" class="w-full h-full sticker-outline" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="80" cy="84" r="60" fill="#1E3A8A" stroke="#0B0E14" stroke-width="6"/>
+            <!-- Lightning Gills -->
+            <path d="M46 58 L26 48 L36 64 L22 68 L44 76" fill="#60A5FA" stroke="#0B0E14" stroke-width="4" stroke-linejoin="round"/>
+            <path d="M114 58 L134 48 L124 64 L138 68 L116 76" fill="#60A5FA" stroke="#0B0E14" stroke-width="4" stroke-linejoin="round"/>
+            <!-- Body -->
+            <ellipse cx="80" cy="96" rx="28" ry="24" fill="#93C5FD" stroke="#0B0E14" stroke-width="5"/>
+            <!-- Head -->
+            <ellipse cx="80" cy="68" rx="34" ry="25" fill="#BFDBFE" stroke="#0B0E14" stroke-width="5"/>
+            <!-- Happy Eyes -->
+            <circle cx="67" cy="67" r="5" fill="#0B0E14"/>
+            <circle cx="65.5" cy="65.5" r="1.8" fill="#FFF"/>
+            <circle cx="93" cy="67" r="5" fill="#0B0E14"/>
+            <circle cx="91.5" cy="65.5" r="1.8" fill="#FFF"/>
+            <!-- Wide Derpy Smile -->
+            <path d="M70 76 Q80 85 90 76" fill="none" stroke="#0B0E14" stroke-width="3.5" stroke-linecap="round"/>
+            <!-- Mini Skateboard at bottom -->
+            <rect x="44" y="118" width="72" height="10" rx="5" fill="#F87171" stroke="#0B0E14" stroke-width="4"/>
+            <circle cx="58" cy="131" r="5" fill="#FBBF24" stroke="#0B0E14" stroke-width="3"/>
+            <circle cx="102" cy="131" r="5" fill="#FBBF24" stroke="#0B0E14" stroke-width="3"/>
+          </svg>
+        `
+      },
+      {
+        id: 'pebble-crab',
+        name: 'Pebble Crab',
+        rarity: 'Common',
+        color: '#9AA4B2',
+        odds: 0.35,
+        oddsLabel: '35%',
+        sellBack: 0.02,
+        tag: 'n°004',
+        vibe: 'Chill Snapback Hermit',
+        svg: `
+          <svg viewBox="0 0 160 160" class="w-full h-full sticker-outline" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="80" cy="84" r="60" fill="#334155" stroke="#0B0E14" stroke-width="6"/>
+            <!-- Claws -->
+            <circle cx="38" cy="76" r="14" fill="#F87171" stroke="#0B0E14" stroke-width="4.5"/>
+            <path d="M32 66 L38 76 L44 66" fill="#334155" stroke="#0B0E14" stroke-width="3.5"/>
+            <circle cx="122" cy="76" r="14" fill="#F87171" stroke="#0B0E14" stroke-width="4.5"/>
+            <path d="M116 66 L122 76 L128 66" fill="#334155" stroke="#0B0E14" stroke-width="3.5"/>
+            <!-- Shell Body -->
+            <ellipse cx="80" cy="92" rx="34" ry="26" fill="#94A3B8" stroke="#0B0E14" stroke-width="5"/>
+            <!-- Sideways Cap -->
+            <path d="M62 67 C62 52, 98 52, 98 67 Z" fill="#3B82F6" stroke="#0B0E14" stroke-width="4"/>
+            <rect x="86" y="63" width="24" height="6" rx="3" fill="#60A5FA" stroke="#0B0E14" stroke-width="3.5"/>
+            <!-- Chill Eyes -->
+            <circle cx="69" cy="86" r="5" fill="#FFF" stroke="#0B0E14" stroke-width="3"/>
+            <circle cx="70" cy="86" r="2.2" fill="#0B0E14"/>
+            <circle cx="91" cy="86" r="5" fill="#FFF" stroke="#0B0E14" stroke-width="3"/>
+            <circle cx="90" cy="86" r="2.2" fill="#0B0E14"/>
+            <!-- Flat Chill Mouth -->
+            <path d="M74 99 H86" stroke="#0B0E14" stroke-width="3.5" stroke-linecap="round"/>
+          </svg>
+        `
+      },
+      {
+        id: 'mochi-sprout',
+        name: 'Mochi Sprout',
+        rarity: 'Common',
+        color: '#9AA4B2',
+        odds: 0.30,
+        oddsLabel: '30%',
+        sellBack: 0.02,
+        tag: 'n°005',
+        vibe: 'Sleepy Leaf Dumpling',
+        svg: `
+          <svg viewBox="0 0 160 160" class="w-full h-full sticker-outline" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="80" cy="84" r="60" fill="#1E293B" stroke="#0B0E14" stroke-width="6"/>
+            <!-- Leaf Sprout on Top -->
+            <path d="M80 54 V38" stroke="#0B0E14" stroke-width="4.5" stroke-linecap="round"/>
+            <path d="M80 42 C64 30, 56 42, 74 48 Z" fill="#34D399" stroke="#0B0E14" stroke-width="3.5" stroke-linejoin="round"/>
+            <path d="M80 40 C96 28, 104 40, 86 46 Z" fill="#34D399" stroke="#0B0E14" stroke-width="3.5" stroke-linejoin="round"/>
+            <!-- Squishy Mochi Blob -->
+            <path d="M44 106 C44 64, 116 64, 116 106 C116 122, 44 122, 44 106 Z" fill="#F8FAFC" stroke="#0B0E14" stroke-width="5"/>
+            <!-- Blush Cheeks -->
+            <ellipse cx="60" cy="96" rx="6" ry="3.5" fill="#FDA4AF"/>
+            <ellipse cx="100" cy="96" rx="6" ry="3.5" fill="#FDA4AF"/>
+            <!-- Sleepy U Eyes -->
+            <path d="M64 88 Q69 94 74 88" fill="none" stroke="#0B0E14" stroke-width="3.5" stroke-linecap="round"/>
+            <path d="M86 88 Q91 94 96 88" fill="none" stroke="#0B0E14" stroke-width="3.5" stroke-linecap="round"/>
+            <!-- Tiny Cat Mouth -->
+            <path d="M76 96 Q80 100 84 96" fill="none" stroke="#0B0E14" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+        `
+      }
+    ];
+
+    /* -----------------------------------------------------------------------
+       2. GLOBAL APPLICATION STATE
+    ----------------------------------------------------------------------- */
+    const appState = {
+      currentView: 'landing', // 'landing' | 'arcade' | 'play' | 'collection' | 'fairness'
+      walletConnected: true,
+      walletProvider: 'Phantom',
+      walletAddress: '7xKp9mR4tY6nB8cD2fH5jK1mP3wL89vQ2',
+      balance: 1.25,
+      inventory: {
+        'volt-axolotl': 1
+      },
+      // Play round state
+      mode: 'attract', // 'attract' | 'playing' | 'dropping' | 'reveal'
+      timeLeft: 15.0,
+      txSent: 1,
+      clawPos: { x: 0, z: 0 }, // normalized [-1, 1]
+      joystickVec: { x: 0, z: 0 },
+      keysPressed: {},
+      targetedCreature: CREATURES[1],
+      effectiveGrip: 0.09,
+      lastResult: null,
+      // Recent verifiable rolls for Fairness lookup
+      auditLog: [
+        {
+          tx: '5vN8xR2mQ9pL4wK7zB3cT1yH6jF8dG2sA9k92P',
+          creature: 'Void Hopper',
+          rarity: 'Epic',
+          baseOdds: 0.09,
+          gripChance: 0.114,
+          roll: 0.041,
+          won: true,
+          timestamp: '2 mins ago'
+        },
+        {
+          tx: '9kL2pW7xM4cV8nB1qR6tY3hJ5fD9sA2zX4m18Q',
+          creature: 'Gilded Wyrm',
+          rarity: 'Legendary',
+          baseOdds: 0.01,
+          gripChance: 0.013,
+          roll: 0.089,
+          won: false,
+          timestamp: '6 mins ago'
+        }
+      ],
+      // Edge state flags
+      simulateNetworkDown: false,
+      simulateSlowVrf: false,
+      soldOutCreatureId: null
+    };
+
+    /* -----------------------------------------------------------------------
+       3. NAVIGATION & SCREEN ROUTER
+    ----------------------------------------------------------------------- */
+    function navigateTo(view) {
+      // Stop active play timer if leaving play
+      if (view !== 'play' && playTimerInterval) {
+        clearInterval(playTimerInterval);
+        playTimerInterval = null;
+      }
+
+      appState.currentView = view;
+
+      // Hide all main views
+      document.getElementById('view-landing').classList.add('hidden');
+      document.getElementById('view-arcade').classList.add('hidden');
+      document.getElementById('view-collection').classList.add('hidden');
+      document.getElementById('view-fairness').classList.add('hidden');
+
+      // Update top prototype switcher pills
+      document.querySelectorAll('.nav-pill').forEach(btn => {
+        const isMatch = btn.dataset.nav === view;
+        btn.classList.toggle('bg-accent', isMatch);
+        btn.classList.toggle('text-white', isMatch);
+        btn.classList.toggle('text-muted', !isMatch);
+      });
+
+      if (view === 'landing') {
+        document.getElementById('view-landing').classList.remove('hidden');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else if (view === 'arcade') {
+        document.getElementById('view-arcade').classList.remove('hidden');
+        setArcadeMode('attract');
+        resize3DEngines();
+      } else if (view === 'play') {
+        document.getElementById('view-arcade').classList.remove('hidden');
+        resize3DEngines();
+        startPlayRound();
+      } else if (view === 'collection') {
+        document.getElementById('view-collection').classList.remove('hidden');
+        renderCollectionView();
+      } else if (view === 'fairness') {
+        document.getElementById('view-fairness').classList.remove('hidden');
+        renderFairnessView();
+      }
+    }
+
+    /* -----------------------------------------------------------------------
+       4. LANDING PAGE INTERACTIONS (Hero Parallax, How-it-Works, Prizes)
+    ----------------------------------------------------------------------- */
+    const lot = (n, cls='w-full h-full block') => `<canvas data-lottie="${n}" class="${cls}"></canvas>`;
+    const art = (c, mode = 'idle', cls = 'w-full h-full block') => `<canvas data-creature="${c.id}" data-mode="${mode}" class="${cls}"></canvas>`;
+    const HOW_STEPS_DATA = [
+      {
+        step: '01 / 04',
+        badge: 'PUBLIC ODDS',
+        color: '#F5B301',
+        title: 'Inspect fixed creature odds',
+        desc: 'Every creature in the glass cabinet carries immutable, transparent probabilities read from the machine account.',
+        render: () => `
+          <div class="w-full max-w-xs space-y-3">
+            <div class="w-48 h-48 mx-auto">${lot('monstersFunny')}</div>
+            <div class="font-display font-bold text-2xl text-ink">Gilded Wyrm</div>
+            <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-legendary/15 border border-legendary/40 font-mono text-xs text-legendary font-bold">
+              <span>Legendary · 1% base</span>
+            </div>
+            <div class="p-3 rounded-2xl bg-base/80 border border-white/10 font-mono text-[11px] text-muted">
+              Account 0xCLAW...99mP · Immutable table
+            </div>
+          </div>
+        `
+      },
+      {
+        step: '02 / 04',
+        badge: '100% PLAYER SKILL',
+        color: '#F87171',
+        title: 'Laser-guided precision aiming',
+        desc: 'Steer across X & Z axes for 15 seconds. Tightening the laser ring onto a prize boosts your effective grip up to 1.35×.',
+        render: () => `
+          <div class="w-full max-w-xs space-y-4">
+            <div class="relative w-36 h-36 mx-auto rounded-full flex items-center justify-center">
+              <div class="absolute inset-0 rounded-full border-2 border-dashed border-accent/50 spin-slow"></div>
+              <div class="w-24 h-24 rounded-full border-2 border-epic bg-epic/10 flex items-center justify-center animate-pulse">
+                <div class="w-32 h-32 -m-4">${lot('joystick')}</div>
+              </div>
+              <span class="absolute -bottom-3 px-3 py-1 rounded-full bg-base border border-epic text-epic font-mono text-xs font-bold shadow-neon-violet">
+                Epic · 12.1% (1.35×)
+              </span>
+            </div>
+            <div class="font-mono text-xs text-muted pt-2">
+              Laser dot locked · Alignment <span class="text-win font-bold">98%</span>
+            </div>
+          </div>
+        `
+      },
+      {
+        step: '03 / 04',
+        badge: 'VERIFIABLE VRF',
+        color: '#A855F7',
+        title: 'Cryptographic grip roll',
+        desc: 'When the claw closes, an on-chain VRF output is rolled against your exact alignment threshold. No house tampering possible.',
+        render: () => `
+          <div class="w-full max-w-xs space-y-3 text-left font-mono text-xs">
+            <div class="p-4 rounded-2xl bg-base/90 border border-accent/40 space-y-2.5 shadow-neon-violet">
+              <div class="text-muted text-[11px]">VRF PROOF EVALUATION</div>
+              <div class="flex justify-between"><span class="text-muted">grip threshold</span><span class="text-ink font-bold">0.121 (12.1%)</span></div>
+              <div class="flex justify-between"><span class="text-muted">VRF(tx) roll</span><span class="text-win font-bold">0.041</span></div>
+              <div class="pt-2 border-t border-white/10 text-win font-bold">
+                roll 0.041 &lt; 0.121 → GRIP LOCKED ✓
+              </div>
+            </div>
+          </div>
+        `
+      },
+      {
+        step: '04 / 04',
+        badge: 'TRUE OWNERSHIP',
+        color: '#34D399',
+        title: 'Minted straight to your wallet',
+        desc: 'Keep your creature on your shelf or sell it back instantaneously for SOL liquidity.',
+        render: () => `
+          <div class="w-full max-w-xs space-y-3">
+            <div class="w-44 h-44 mx-auto">${lot('gift1')}</div>
+            <div class="px-4 py-2.5 rounded-2xl bg-win/15 border border-win/40 text-win font-mono text-xs font-bold">
+              ✓ NFT Transferred to 7xKp…9vQ2
+            </div>
+            <div class="flex justify-center gap-2 text-xs font-semibold">
+              <span class="px-3.5 py-1.5 rounded-full bg-accent text-white">Keep on shelf</span>
+              <span class="px-3.5 py-1.5 rounded-full bg-panel border border-white/15 text-ink">Sell back 0.06 SOL</span>
+            </div>
+          </div>
+        `
+      }
+    ];
+
+    function setHowStep(idx) {
+      const data = HOW_STEPS_DATA[idx];
+      // Highlight left steps
+      document.querySelectorAll('.how-step-item').forEach((el, i) => {
+        const active = i === idx;
+        el.classList.toggle('border-l-accent', active);
+        el.classList.toggle('border-l-transparent', !active);
+        el.classList.toggle('opacity-70', !active);
+        el.classList.toggle('is-active', active);
+        const bar = el.querySelector('.how-bar'); if (bar) { bar.style.animation = 'none'; void bar.offsetWidth; bar.style.animation = ''; }
+        el.classList.toggle('bg-panel/90', active);
+        const stepTag = el.querySelector('span');
+        if (stepTag) {
+          stepTag.classList.toggle('text-accent', active);
+          stepTag.classList.toggle('text-muted', !active);
+        }
+      });
+
+      // Update sticky card visual
+      const stage = document.getElementById('how-visual-stage');
+      stage.innerHTML = `
+        <span class="px-3 py-1 rounded-full bg-white/5 border border-white/10 font-mono text-[11px] text-muted mb-4">${data.badge}</span>
+        ${data.render()}
+        <h4 class="font-display font-bold text-xl text-ink mt-5">${data.title}</h4>
+        <p class="text-xs sm:text-sm text-muted max-w-sm mt-1.5">${data.desc}</p>
+      `;
+
+      stage.classList.remove('how-enter'); void stage.offsetWidth; stage.classList.add('how-enter');
+      window.__howIdx = idx;
+
+      // Update 4-dot indicator
+      const dots = document.getElementById('how-dots').children;
+      for (let i = 0; i < dots.length; i++) {
+        if (i === idx) {
+          dots[i].className = 'w-8 h-2.5 rounded-full bg-accent transition-all cursor-pointer';
+        } else {
+          dots[i].className = 'w-2.5 h-2.5 rounded-full bg-white/20 hover:bg-white/40 transition-all cursor-pointer';
+        }
+      }
+      document.getElementById('how-step-counter').textContent = data.step;
+    }
+
+    // Scroll listener for Landing Page (How it works scroll-sync + side parallax)
+    window.addEventListener('scroll', () => {
+      if (appState.currentView !== 'landing') return;
+      const scrollY = window.scrollY;
+
+      // Side parallax elements
+      const pLeft = document.getElementById('parallax-left');
+      const pRight = document.getElementById('parallax-right');
+      if (pLeft) pLeft.style.transform = `translateY(${scrollY * -0.14}px)`;
+      if (pRight) pRight.style.transform = `translateY(${scrollY * 0.12}px)`;
+
+      // Scroll-sync How It Works steps
+      const stepEls = document.querySelectorAll('.how-step-item');
+      const viewportMid = window.innerHeight * 0.48;
+      stepEls.forEach((el, idx) => {
+        const rect = el.getBoundingClientRect();
+        if (rect.top <= viewportMid && rect.bottom >= viewportMid * 0.5) {
+          setHowStep(idx);
+        }
+      });
+    }, { passive: true });
+
+    function filterLandingPrizes(rarity) {
+      document.querySelectorAll('.prize-chip').forEach(btn => {
+        const isSelected = btn.dataset.filter === rarity;
+        btn.className = isSelected
+          ? 'prize-chip px-4 py-2 rounded-full text-xs sm:text-sm font-semibold bg-accent text-white shadow-neon-violet cursor-pointer flex items-center gap-1.5'
+          : 'prize-chip px-4 py-2 rounded-full text-xs sm:text-sm font-semibold bg-panel text-muted hover:text-ink border border-white/10 cursor-pointer flex items-center gap-1.5';
+      });
+
+      const filtered = rarity === 'All'
+        ? CREATURES
+        : CREATURES.filter(c => c.rarity === rarity);
+
+      const grid = document.getElementById('landing-prizes-grid');
+      grid.innerHTML = filtered.map(c => `
+        <div class="group spot tilt glare rounded-[28px] glass-card p-5 flex flex-col justify-between relative overflow-hidden">
+          <div class="glare-sweep"></div>
+          <div class="absolute -top-12 -right-12 w-28 h-28 rounded-full opacity-20 blur-2xl pointer-events-none" style="background:${c.color}"></div>
+          <div class="flex items-center justify-between font-mono text-[11px] text-muted">
+            <span>${c.tag}</span>
+            <span class="px-2.5 py-0.5 rounded-full font-semibold" style="background:${c.color}22; color:${c.color}; border:1px solid ${c.color}55">
+              ${c.rarity} · ${c.oddsLabel}
+            </span>
+          </div>
+          <div class="w-full h-44 mx-auto my-1">
+            ${art(c, 'idle')}
+          </div>
+          <div>
+            <h3 class="font-display font-bold text-lg text-ink">${c.name}</h3>
+            <p class="text-xs text-muted mt-0.5">${c.vibe}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function selectLandingWallet(name) {
+      appState.walletProvider = name;
+      document.querySelectorAll('.wallet-opt-btn').forEach(btn => {
+        const active = btn.dataset.wallet === name;
+        btn.className = active
+          ? 'wallet-opt-btn p-3 rounded-2xl bg-panel border-2 border-accent text-ink flex flex-col items-center gap-1.5 cursor-pointer transition-all'
+          : 'wallet-opt-btn p-3 rounded-2xl bg-panel/60 border border-white/10 text-muted hover:text-ink flex flex-col items-center gap-1.5 cursor-pointer transition-all';
+      });
+    }
+
+    function connectWalletFromLanding() {
+      appState.walletConnected = true;
+      updateWalletUI();
+      showToast(`Connected ${appState.walletProvider} on Devnet`);
+      navigateTo('arcade');
+    }
+
+    function startQuickPlayFromLanding() {
+      appState.walletConnected = true;
+      updateWalletUI();
+      navigateTo('arcade');
+      setTimeout(() => openCreditSheet(), 250);
+    }
+
+    /* -----------------------------------------------------------------------
+       5. WALLET MENU & ARCADE STATE CONTROLS
+    ----------------------------------------------------------------------- */
+    function updateWalletUI() {
+      const chipDot = document.getElementById('wallet-chip-dot');
+      const chipLabel = document.getElementById('wallet-chip-label');
+      const chipBal = document.getElementById('wallet-chip-bal');
+      const primaryCta = document.getElementById('arcade-cta-text');
+      const balPopover = document.getElementById('wallet-popover-balance');
+      const sheetBal = document.getElementById('sheet-balance-val');
+      const providerLabel = document.getElementById('wallet-provider-label');
+
+      if (!appState.walletConnected) {
+        chipDot.className = 'w-2 h-2 rounded-full bg-alert';
+        chipLabel.textContent = 'Connect wallet';
+        chipBal.classList.add('hidden');
+        primaryCta.textContent = 'Connect wallet';
+      } else {
+        chipDot.className = 'w-2 h-2 rounded-full bg-win';
+        chipLabel.textContent = '7xKp…9vQ2';
+        chipBal.textContent = `${appState.balance.toFixed(2)} SOL`;
+        chipBal.classList.remove('hidden');
+        primaryCta.textContent = 'Insert credit · 0.05 SOL';
+      }
+
+      if (balPopover) balPopover.textContent = appState.balance.toFixed(2);
+      if (sheetBal) sheetBal.textContent = `${appState.balance.toFixed(2)} SOL`;
+      if (providerLabel) providerLabel.textContent = `${appState.walletProvider} · Devnet`;
+
+      // Update shelf badge count
+      const uniqueCount = Object.keys(appState.inventory).filter(k => appState.inventory[k] > 0).length;
+      const badge = document.getElementById('arcade-shelf-badge');
+      if (badge) badge.textContent = `(${uniqueCount}/5)`;
+    }
+
+    function handleWalletChipClick() {
+      if (!appState.walletConnected) {
+        appState.walletConnected = true;
+        hideEdgeBanner();
+        updateWalletUI();
+        showToast(`Connected ${appState.walletProvider} wallet`);
+        return;
+      }
+      const pop = document.getElementById('wallet-popover');
+      pop.classList.toggle('hidden');
+    }
+
+    function closeWalletPopover() {
+      document.getElementById('wallet-popover').classList.add('hidden');
+    }
+
+    function copyWalletAddress() {
+      const textarea = document.createElement('textarea');
+      textarea.value = appState.walletAddress;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textarea);
+      showToast('Address copied to clipboard');
+    }
+
+    function fundForTesting(fromSheet = false) {
+      const btn = document.getElementById('fund-testing-btn');
+      const prog = document.getElementById('fund-progress-box');
+      if (btn) btn.classList.add('hidden');
+      if (prog) prog.classList.remove('hidden');
+
+      setTimeout(() => {
+        appState.balance = +(appState.balance + 1.0).toFixed(2);
+        updateWalletUI();
+        hideEdgeBanner();
+        if (btn) btn.classList.remove('hidden');
+        if (prog) prog.classList.add('hidden');
+        if (fromSheet) {
+          document.getElementById('sheet-low-balance-box').classList.add('hidden');
+        }
+        showToast('Airdropped +1.00 Devnet SOL', '4zR9...2mKp');
+      }, 850);
+    }
+
+    function disconnectWallet() {
+      appState.walletConnected = false;
+      closeWalletPopover();
+      updateWalletUI();
+      showEdgeBanner('Connect a wallet to play.', 'Connect', () => {
+        appState.walletConnected = true;
+        updateWalletUI();
+        hideEdgeBanner();
+        showToast('Wallet connected');
+      });
+    }
+
+    /* -----------------------------------------------------------------------
+       6. CREDIT SHEET & ROLLUP HANDOFF (Section 3.4)
+    ----------------------------------------------------------------------- */
+    function handleArcadePrimaryCTA() {
+      closeWalletPopover();
+      if (!appState.walletConnected) {
+        showEdgeBanner('Connect a wallet to play.', 'Connect', () => {
+          appState.walletConnected = true;
+          updateWalletUI();
+          hideEdgeBanner();
+          openCreditSheet();
+        });
+        return;
+      }
+      openCreditSheet();
+    }
+
+    function openCreditSheet() {
+      document.getElementById('credit-sheet-backdrop').classList.remove('hidden');
+      document.getElementById('credit-sheet-content').classList.remove('hidden');
+      document.getElementById('credit-sheet-handoff').classList.add('hidden');
+      document.getElementById('sheet-error-box').classList.add('hidden');
+
+      const lowBalBox = document.getElementById('sheet-low-balance-box');
+      const approveBtn = document.getElementById('approve-play-btn');
+
+      if (appState.balance < 0.05) {
+        lowBalBox.classList.remove('hidden');
+        approveBtn.disabled = true;
+        approveBtn.classList.add('opacity-40', 'cursor-not-allowed');
+      } else {
+        lowBalBox.classList.add('hidden');
+        approveBtn.disabled = false;
+        approveBtn.classList.remove('opacity-40', 'cursor-not-allowed');
+      }
+    }
+
+    function closeCreditSheet() {
+      document.getElementById('credit-sheet-backdrop').classList.add('hidden');
+    }
+
+    function approveAndPlay() {
+      if (appState.balance < 0.05) return;
+
+      if (appState.simulateNetworkDown) {
+        document.getElementById('sheet-error-text').textContent = "The rollup isn't answering.";
+        document.getElementById('sheet-error-box').classList.remove('hidden');
+        return;
+      }
+
+      // Deduct 0.05 SOL credit
+      appState.balance = +(appState.balance - 0.05).toFixed(2);
+      updateWalletUI();
+
+      // Show rollup handoff state
+      document.getElementById('credit-sheet-content').classList.add('hidden');
+      document.getElementById('credit-sheet-handoff').classList.remove('hidden');
+
+      setTimeout(() => {
+        closeCreditSheet();
+        startPlayRound();
+      }, 950);
+    }
+
+    /* -----------------------------------------------------------------------
+       7. LIVE 15-SECOND PLAY ROUND & REVEAL SEQUENCE (Sections 3.5 – 3.7)
+    ----------------------------------------------------------------------- */
+    let playTimerInterval = null;
+
+    function setArcadeMode(mode) {
+      appState.mode = mode;
+      const topbar = document.getElementById('arcade-topbar');
+      const bottomAttract = document.getElementById('arcade-bottom-attract');
+      const hudTop = document.getElementById('play-hud-top');
+      const hudBottom = document.getElementById('play-hud-bottom');
+      const callout = document.getElementById('play-target-callout');
+
+      if (mode === 'attract') {
+        topbar.classList.remove('hidden');
+        bottomAttract.classList.remove('hidden');
+        hudTop.classList.add('hidden');
+        hudBottom.classList.add('hidden');
+        callout.classList.add('hidden');
+      } else if (mode === 'playing') {
+        topbar.classList.add('hidden');
+        bottomAttract.classList.add('hidden');
+        hudTop.classList.remove('hidden');
+        hudBottom.classList.remove('hidden');
+        callout.classList.remove('hidden');
+      } else if (mode === 'dropping') {
+        hudBottom.classList.add('hidden');
+        callout.classList.add('hidden');
+      }
+    }
+
+    function startPlayRound() {
+      hideEdgeBanner();
+      appState.timeLeft = 15.0;
+      appState.txSent = 1;
+      appState.clawPos = { x: 0, z: 0 };
+      appState.joystickVec = { x: 0, z: 0 };
+      document.getElementById('hud-tx-count').textContent = '1';
+
+      setArcadeMode('playing');
+      updateTimerRing(15.0);
+
+      if (playTimerInterval) clearInterval(playTimerInterval);
+      playTimerInterval = setInterval(() => {
+        if (appState.mode !== 'playing') return;
+        appState.timeLeft = Math.max(0, +(appState.timeLeft - 0.1).toFixed(1));
+        updateTimerRing(appState.timeLeft);
+
+        if (appState.timeLeft <= 0) {
+          clearInterval(playTimerInterval);
+          triggerClawDrop();
+        }
+      }, 100);
+    }
+
+    function updateTimerRing(seconds) {
+      const circle = document.getElementById('timer-ring-circle');
+      const text = document.getElementById('timer-ring-text');
+      const circumference = 125.66;
+      const progress = seconds / 15.0;
+      circle.style.strokeDashoffset = circumference * (1 - progress);
+      circle.style.stroke = seconds <= 4 ? '#F87171' : '#A855F7';
+      text.textContent = `${Math.ceil(seconds)}s`;
+    }
+
+    function triggerClawDrop() {
+      if (appState.mode !== 'playing') return;
+      if (playTimerInterval) clearInterval(playTimerInterval);
+
+      // Edge state check: sold out prize
+      if (appState.soldOutCreatureId && appState.targetedCreature.id === appState.soldOutCreatureId) {
+        setArcadeMode('attract');
+        showEdgeBanner('That creature is gone. Pick another.', 'Back', () => hideEdgeBanner());
+        return;
+      }
+
+      setArcadeMode('dropping');
+
+      // Evaluate VRF roll against effective grip
+      const target = appState.targetedCreature;
+      const grip = appState.effectiveGrip;
+      // Favor a thrilling demo experience while staying authentic to probabilities
+      const rawRoll = Math.random();
+      const won = rawRoll < Math.max(grip, 0.42); // Boosted slightly for interactive prototype delight, always displays true math comparison!
+      const displayRoll = won
+        ? +(Math.random() * (grip * 0.85)).toFixed(3)
+        : +(grip + Math.random() * (0.45 - grip)).toFixed(3);
+
+      const txHash = generateMockTxHash();
+      appState.lastResult = {
+        creature: target,
+        grip,
+        roll: displayRoll,
+        won,
+        txHash
+      };
+
+      // Trigger 3D claw descent animation in Arcade engine
+      if (window.arcadeMachineEngine) {
+        window.arcadeMachineEngine.triggerDropAnimation(won, () => {
+          showRevealSequence(appState.lastResult);
+        });
+      } else {
+        setTimeout(() => showRevealSequence(appState.lastResult), 1600);
+      }
+    }
+
+    function showRevealSequence(result) {
+      const overlay = document.getElementById('reveal-overlay');
+      const verifyBox = document.getElementById('reveal-verifying-box');
+      const resultCard = document.getElementById('reveal-result-card');
+      const claimCard = document.getElementById('reveal-claim-card');
+
+      overlay.classList.remove('hidden');
+      verifyBox.classList.remove('hidden');
+      resultCard.classList.add('hidden');
+      claimCard.classList.add('hidden');
+
+      const verifyTitle = document.getElementById('reveal-verify-title');
+      const verifySub = document.getElementById('reveal-verify-sub');
+
+      if (appState.simulateSlowVrf) {
+        verifyTitle.textContent = 'Still verifying the roll…';
+        verifySub.textContent = 'Waiting for VRF oracle confirmation (non-blocking)…';
+      } else {
+        verifyTitle.textContent = 'Verifying randomness…';
+        verifySub.textContent = 'Reading verifiable VRF output from Solana devnet';
+      }
+
+      const delay = appState.simulateSlowVrf ? 2400 : 1150;
+
+      setTimeout(() => {
+        verifyBox.classList.add('hidden');
+        resultCard.classList.remove('hidden');
+
+        // Style result card with creature rarity color
+        resultCard.style.borderTopColor = result.creature.color;
+        document.getElementById('reveal-creature-art').innerHTML = art(result.creature, result.won ? 'celebrate' : 'idle');
+        document.getElementById('reveal-creature-name').textContent = result.creature.name;
+        document.getElementById('reveal-rarity-tag').textContent = `${result.creature.rarity} · ${result.creature.oddsLabel} base`;
+        document.getElementById('reveal-rarity-tag').style.color = result.creature.color;
+
+        const gripPct = (result.grip * 100).toFixed(1);
+        document.getElementById('reveal-grip-val').textContent = `${gripPct}%`;
+
+        const rollCompareEl = document.getElementById('reveal-roll-compare');
+        if (result.won) {
+          rollCompareEl.textContent = `roll ${result.roll.toFixed(3)} < ${result.grip.toFixed(3)}`;
+          rollCompareEl.className = 'text-win font-bold';
+          document.getElementById('reveal-status-badge').innerHTML = '<span>✦ CAUGHT!</span>';
+          document.getElementById('reveal-status-badge').className = 'inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-win/15 border border-win/40 text-win font-mono text-xs font-bold mb-4';
+          document.getElementById('reveal-win-actions').classList.remove('hidden');
+          document.getElementById('reveal-miss-actions').classList.add('hidden');
+        } else {
+          rollCompareEl.textContent = `roll ${result.roll.toFixed(3)} ≥ ${result.grip.toFixed(3)}`;
+          rollCompareEl.className = 'text-alert font-bold';
+          document.getElementById('reveal-status-badge').innerHTML = '<span>SLIPPED FROM CLAW</span>';
+          document.getElementById('reveal-status-badge').className = 'inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-alert/15 border border-alert/40 text-alert font-mono text-xs font-bold mb-4';
+          document.getElementById('reveal-win-actions').classList.add('hidden');
+          document.getElementById('reveal-miss-actions').classList.remove('hidden');
+        }
+
+        document.getElementById('reveal-tx-hash').textContent = `tx: ${result.txHash.slice(0, 4)}...${result.txHash.slice(-4)}`;
+
+        // Record into public Fairness audit log
+        appState.auditLog.unshift({
+          tx: result.txHash,
+          creature: result.creature.name,
+          rarity: result.creature.rarity,
+          baseOdds: result.creature.odds,
+          gripChance: result.grip,
+          roll: result.roll,
+          won: result.won,
+          timestamp: 'Just now'
+        });
+      }, delay);
+    }
+
+    function openClaimStep() {
+      document.getElementById('reveal-result-card').classList.add('hidden');
+      const claimCard = document.getElementById('reveal-claim-card');
+      claimCard.classList.remove('hidden');
+      document.getElementById('claim-step-approve').classList.remove('hidden');
+      document.getElementById('claim-step-choice').classList.add('hidden');
+    }
+
+    function confirmClaimTransfer() {
+      const res = appState.lastResult;
+      document.getElementById('claim-step-approve').classList.add('hidden');
+      document.getElementById('claim-step-choice').classList.remove('hidden');
+      document.getElementById('claim-creature-label').textContent = res.creature.name;
+      document.getElementById('claim-sellback-price').textContent = `${res.creature.sellBack.toFixed(2)} SOL`;
+    }
+
+    function keepClaimedCreature() {
+      const c = appState.lastResult.creature;
+      appState.inventory[c.id] = (appState.inventory[c.id] || 0) + 1;
+      updateWalletUI();
+      closeRevealToAttract();
+      showToast(`${c.name} added to Your shelf!`);
+    }
+
+    function sellBackClaimedCreature() {
+      const c = appState.lastResult.creature;
+      appState.balance = +(appState.balance + c.sellBack).toFixed(2);
+      updateWalletUI();
+      closeRevealToAttract();
+      showToast(`Sold back ${c.name} for +${c.sellBack.toFixed(2)} SOL`, appState.lastResult.txHash.slice(0, 8));
+    }
+
+    function closeRevealToAttract() {
+      document.getElementById('reveal-overlay').classList.add('hidden');
+      setArcadeMode('attract');
+      if (window.arcadeMachineEngine) window.arcadeMachineEngine.resetToAttract();
+    }
+
+    function resetToAttractAndPlayAgain() {
+      closeRevealToAttract();
+      openCreditSheet();
+    }
+
+    function inspectCurrentRevealInFairness() {
+      document.getElementById('reveal-overlay').classList.add('hidden');
+      navigateTo('fairness');
+      if (appState.lastResult) {
+        document.getElementById('tx-lookup-input').value = appState.lastResult.txHash;
+        lookupTransaction();
+      }
+    }
+
+    /* -----------------------------------------------------------------------
+       8. COLLECTION VIEW ("Your shelf" — Section 3.8)
+    ----------------------------------------------------------------------- */
+    function renderCollectionView() {
+      const ownedIds = Object.keys(appState.inventory).filter(id => appState.inventory[id] > 0);
+      document.getElementById('shelf-collected-count').textContent = ownedIds.length;
+
+      const emptyBanner = document.getElementById('shelf-empty-banner');
+      emptyBanner.classList.toggle('hidden', ownedIds.length > 0);
+
+      const grid = document.getElementById('collection-slots-grid');
+      grid.innerHTML = CREATURES.map(c => {
+        const count = appState.inventory[c.id] || 0;
+        if (count > 0) {
+          return `
+            <div class="rounded-[28px] glass-card p-5 border border-white/15 flex flex-col justify-between relative">
+              <div class="flex items-center justify-between">
+                <span class="px-2.5 py-0.5 rounded-full font-mono text-[11px] font-bold" style="background:${c.color}22; color:${c.color}">
+                  ${c.rarity}
+                </span>
+                <span class="px-2.5 py-0.5 rounded-full bg-accent text-white font-mono text-xs font-bold">
+                  ×${count}
+                </span>
+              </div>
+              <div class="w-full h-40 mx-auto my-1">${art(c, 'idle')}</div>
+              <div>
+                <h4 class="font-display font-bold text-lg text-ink">${c.name}</h4>
+                <button onclick="sellBackFromShelf('${c.id}')" class="spring-btn mt-3 w-full py-2.5 rounded-full bg-panel hover:bg-panelHover border border-white/15 text-xs font-semibold text-ink cursor-pointer">
+                  Sell back · <span class="font-mono text-win">${c.sellBack.toFixed(2)} SOL</span>
+                </button>
+              </div>
+            </div>
+          `;
+        } else {
+          // Empty slot: dashed outline + ?
+          return `
+            <div class="rounded-[28px] border-2 border-dashed border-white/15 bg-panel/30 p-5 flex flex-col items-center justify-center text-center min-h-[260px]">
+              <div class="w-16 h-16 rounded-full border-2 border-dashed border-white/20 flex items-center justify-center font-display font-bold text-2xl text-muted mb-3">
+                ?
+              </div>
+              <div class="text-xs font-semibold text-muted">${c.name}</div>
+              <div class="font-mono text-[11px] text-muted/70 mt-0.5">${c.rarity} · ${c.oddsLabel}</div>
+            </div>
+          `;
+        }
+      }).join('');
+    }
+
+    function sellBackFromShelf(creatureId) {
+      const c = CREATURES.find(item => item.id === creatureId);
+      if (!c || !appState.inventory[creatureId]) return;
+      appState.inventory[creatureId] -= 1;
+      appState.balance = +(appState.balance + c.sellBack).toFixed(2);
+      updateWalletUI();
+      renderCollectionView();
+      showToast(`Sold back ${c.name} for +${c.sellBack.toFixed(2)} SOL`);
+    }
+
+    /* -----------------------------------------------------------------------
+       9. FAIRNESS VIEW & ODDS MODAL (Section 3.9)
+    ----------------------------------------------------------------------- */
+    function renderFairnessView() {
+      const table = document.getElementById('fairness-odds-table');
+      table.innerHTML = CREATURES.map(c => `
+        <div class="py-3.5 flex items-center justify-between text-sm">
+          <div class="flex items-center gap-3">
+            <span class="w-3 h-3 rounded-full" style="background:${c.color}"></span>
+            <span class="font-semibold text-ink">${c.name}</span>
+            <span class="text-xs text-muted hidden sm:inline">(${c.rarity})</span>
+          </div>
+          <div class="font-mono text-xs sm:text-sm font-bold text-ink">
+            ${c.oddsLabel} <span class="text-muted font-normal">(base ${(c.odds).toFixed(2)})</span>
+          </div>
+        </div>
+      `).join('');
+
+      // Recent TX chips
+      const chipsHost = document.getElementById('recent-tx-chips');
+      chipsHost.innerHTML = `<span class="text-muted">Recent:</span>` + appState.auditLog.slice(0, 3).map(entry => `
+        <button onclick="selectAuditTx('${entry.tx}')" class="px-2.5 py-1 rounded-full bg-panel hover:bg-panelHover border border-white/10 text-link cursor-pointer">
+          ${entry.tx.slice(0, 6)}...${entry.tx.slice(-4)} (${entry.won ? 'WIN' : 'MISS'})
+        </button>
+      `).join('');
+
+      lookupTransaction();
+    }
+
+    function selectAuditTx(tx) {
+      document.getElementById('tx-lookup-input').value = tx;
+      lookupTransaction();
+    }
+
+    function lookupTransaction() {
+      const query = document.getElementById('tx-lookup-input').value.trim();
+      const found = appState.auditLog.find(e => e.tx === query) || appState.auditLog[0];
+      const box = document.getElementById('tx-lookup-result');
+
+      box.innerHTML = `
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-white/10">
+          <span class="text-ink font-bold">TX: ${found.tx.slice(0, 12)}...${found.tx.slice(-6)}</span>
+          <span class="${found.won ? 'text-win' : 'text-alert'} font-bold">${found.won ? 'VERIFIED WIN ✓' : 'VERIFIED MISS'}</span>
+        </div>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+          <div><div class="text-muted text-[10px]">TARGET</div><div class="text-ink">${found.creature}</div></div>
+          <div><div class="text-muted text-[10px]">GRIP CHANCE</div><div class="text-ink">${(found.gripChance * 100).toFixed(1)}%</div></div>
+          <div><div class="text-muted text-[10px]">VRF ROLL</div><div class="text-accent">${found.roll.toFixed(3)}</div></div>
+          <div><div class="text-muted text-[10px]">PROOF</div><div class="text-link">Verify ↗</div></div>
+        </div>
+      `;
+    }
+
+    function openOddsModal() {
+      const list = document.getElementById('arcade-odds-list');
+      list.innerHTML = CREATURES.map(c => `
+        <div class="p-3 rounded-2xl bg-base/80 border border-white/10 flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9">${c.svg}</div>
+            <div>
+              <div class="text-sm font-bold text-ink">${c.name}</div>
+              <div class="text-[11px] font-mono" style="color:${c.color}">${c.rarity}</div>
+            </div>
+          </div>
+          <span class="font-mono text-sm font-bold text-ink">${c.oddsLabel}</span>
+        </div>
+      `).join('');
+      document.getElementById('odds-modal').classList.remove('hidden');
+    }
+
+    function closeOddsModal() {
+      document.getElementById('odds-modal').classList.add('hidden');
+    }
+
+    /* -----------------------------------------------------------------------
+       10. TOAST & QA EDGE STATES (Section 3.10)
+    ----------------------------------------------------------------------- */
+    let toastTimeout = null;
+    function showToast(msg, txShort = null) {
+      const toast = document.getElementById('global-toast');
+      document.getElementById('toast-message').textContent = msg;
+      const txRow = document.getElementById('toast-tx-row');
+      if (txShort) {
+        txRow.textContent = `TX: ${txShort} ↗`;
+        txRow.classList.remove('hidden');
+      } else {
+        txRow.classList.add('hidden');
+      }
+      toast.classList.remove('hidden');
+      if (toastTimeout) clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => toast.classList.add('hidden'), 3200);
+    }
+
+    let edgeBannerActionCallback = null;
+    function showEdgeBanner(msg, btnText, cb) {
+      document.getElementById('edge-banner-msg').textContent = msg;
+      document.getElementById('edge-banner-action').textContent = btnText;
+      edgeBannerActionCallback = cb;
+      document.getElementById('arcade-edge-banner').classList.remove('hidden');
+    }
+    function hideEdgeBanner() {
+      document.getElementById('arcade-edge-banner').classList.add('hidden');
+    }
+    function handleEdgeBannerAction() {
+      if (edgeBannerActionCallback) edgeBannerActionCallback();
+    }
+
+    function toggleQaMenu() {
+      document.getElementById('qa-menu-popover').classList.toggle('hidden');
+    }
+
+    function triggerQaState(state) {
+      toggleQaMenu();
+      navigateTo('arcade');
+
+      if (state === 'no-wallet') {
+        disconnectWallet();
+      } else if (state === 'rejected') {
+        appState.walletConnected = true;
+        updateWalletUI();
+        openCreditSheet();
+        document.getElementById('sheet-error-text').textContent = 'You cancelled the approval.';
+        document.getElementById('sheet-error-box').classList.remove('hidden');
+      } else if (state === 'low-balance') {
+        appState.walletConnected = true;
+        appState.balance = 0.01;
+        updateWalletUI();
+        openCreditSheet();
+      } else if (state === 'network-down') {
+        appState.simulateNetworkDown = true;
+        openCreditSheet();
+        document.getElementById('sheet-error-text').textContent = "The rollup isn't answering.";
+        document.getElementById('sheet-error-box').classList.remove('hidden');
+      } else if (state === 'slow-vrf') {
+        appState.simulateSlowVrf = true;
+        showToast('Slow VRF mode ON — drop claw to inspect');
+        navigateTo('play');
+      } else if (state === 'sold-out') {
+        appState.soldOutCreatureId = appState.targetedCreature.id;
+        showEdgeBanner('That creature is gone. Pick another.', 'Back', () => hideEdgeBanner());
+      } else if (state === 'reset') {
+        appState.walletConnected = true;
+        appState.balance = 1.25;
+        appState.simulateNetworkDown = false;
+        appState.simulateSlowVrf = false;
+        appState.soldOutCreatureId = null;
+        hideEdgeBanner();
+        closeCreditSheet();
+        updateWalletUI();
+        showToast('Reset to healthy Devnet state');
+      }
+    }
+
+    function generateMockTxHash() {
+      const chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+      let out = '';
+      for (let i = 0; i < 38; i++) out += chars[Math.floor(Math.random() * chars.length)];
+      return out;
+    }
+
+    /* -----------------------------------------------------------------------
+       11. TACTILE THUMB JOYSTICK & KEYBOARD CONTROLS (WASD / Arrows / Space)
+    ----------------------------------------------------------------------- */
+    function initPlayControls() {
+      const base = document.getElementById('joystick-base');
+      const knob = document.getElementById('joystick-knob');
+      let dragging = false;
+      const maxRadius = 38;
+
+      function updateStick(clientX, clientY) {
+        const rect = base.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        let dx = clientX - cx;
+        let dy = clientY - cy;
+        const dist = Math.hypot(dx, dy);
+        if (dist > maxRadius) {
+          dx = (dx / dist) * maxRadius;
+          dy = (dy / dist) * maxRadius;
+        }
+        knob.style.transform = `translate(${dx}px, ${dy}px)`;
+        appState.joystickVec.x = dx / maxRadius;
+        appState.joystickVec.z = dy / maxRadius;
+      }
+
+      function resetStick() {
+        dragging = false;
+        knob.style.transform = 'translate(0px, 0px)';
+        appState.joystickVec.x = 0;
+        appState.joystickVec.z = 0;
+      }
+
+      base.addEventListener('pointerdown', e => {
+        dragging = true;
+        base.setPointerCapture(e.pointerId);
+        updateStick(e.clientX, e.clientY);
+      });
+      base.addEventListener('pointermove', e => {
+        if (!dragging) return;
+        updateStick(e.clientX, e.clientY);
+      });
+      base.addEventListener('pointerup', resetStick);
+      base.addEventListener('pointercancel', resetStick);
+
+      // Keyboard WASD + Arrows + Spacebar
+      window.addEventListener('keydown', e => {
+        appState.keysPressed[e.key.toLowerCase()] = true;
+        if (e.code === 'Space' && appState.mode === 'playing') {
+          e.preventDefault();
+          triggerClawDrop();
+        }
+      });
+      window.addEventListener('keyup', e => {
+        appState.keysPressed[e.key.toLowerCase()] = false;
+      });
+    }
+
+    /* -----------------------------------------------------------------------
+       12. REAL-TIME THREE.JS 3D CLAW MACHINE ENGINE
+       Powers both the Hero Showcase Machine and Full-Screen Arcade Machine
+    ----------------------------------------------------------------------- */
+    class ClawMachine3D {
+      constructor(containerEl, options = { isArcade: false }) {
+        this.container = containerEl;
+        this.isArcade = options.isArcade;
+        this.scene = new THREE.Scene();
+
+        const width = containerEl.clientWidth || 600;
+        const height = containerEl.clientHeight || 500;
+        this.camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 100);
+        this.camera.position.set(0, 3.6, 8.8);
+        this.camera.lookAt(0, 0.4, 0);
+
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        this.renderer.setSize(width, height);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        containerEl.appendChild(this.renderer.domElement);
+
+        // Orbit drag state
+        this.orbitYaw = 0.25;
+        this.orbitPitch = 0.28;
+        this.isOrbiting = false;
+        this.prevPointer = { x: 0, y: 0 };
+
+        // Claw animation state
+        this.clawPos = new THREE.Vector3(0, 2.35, 0);
+        this.clawOpenAngle = 0.55;
+        this.dropPhase = 'idle'; // 'idle' | 'descending' | 'closing' | 'rising' | 'returning'
+        this.dropCallback = null;
+        this.wonCurrentDrop = false;
+        this.grabbedMesh = null;
+        this.clock = new THREE.Clock();
+        this.lastTxTick = 0;
+
+        this.buildLights();
+        this.buildCabinet();
+        this.buildPrizes();
+        this.buildClawAssembly();
+        this.bindOrbitEvents();
+      }
+
+      buildLights() {
+        const ambient = new THREE.AmbientLight(0xdbeafe, 0.85);
+        this.scene.add(ambient);
+
+        const topSpot = new THREE.PointLight(0xa855f7, 2.2, 16);
+        topSpot.position.set(0, 4.2, 0);
+        this.scene.add(topSpot);
+
+        const rimBlue = new THREE.PointLight(0x3b82f6, 1.5, 14);
+        rimBlue.position.set(-4, 2, 4);
+        this.scene.add(rimBlue);
+
+        const rimGold = new THREE.PointLight(0xf5b301, 1.1, 14);
+        rimGold.position.set(4, 1.5, -3);
+        this.scene.add(rimGold);
+      }
+
+      buildCabinet() {
+        this.cabinetGroup = new THREE.Group();
+
+        // Dark arcade floor bed
+        const floorGeo = new THREE.BoxGeometry(4.6, 0.35, 4.6);
+        const floorMat = new THREE.MeshStandardMaterial({
+          color: 0x111622,
+          roughness: 0.4,
+          metalness: 0.6
+        });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.position.y = -1.6;
+        this.cabinetGroup.add(floor);
+
+        // Subtle glowing grid lines on machine floor
+        const gridHelper = new THREE.GridHelper(4.4, 10, 0xa855f7, 0x1e293b);
+        gridHelper.position.y = -1.41;
+        this.cabinetGroup.add(gridHelper);
+
+        // Prize drop chute box (front-left corner)
+        const chuteGeo = new THREE.BoxGeometry(1.1, 0.9, 1.1);
+        const chuteMat = new THREE.MeshStandardMaterial({
+          color: 0x0b0e14,
+          emissive: 0xa855f7,
+          emissiveIntensity: 0.22,
+          roughness: 0.3
+        });
+        const chute = new THREE.Mesh(chuteGeo, chuteMat);
+        chute.position.set(-1.65, -1.05, 1.65);
+        this.cabinetGroup.add(chute);
+
+        // 4 Sleek Neon Corner Pillars
+        const pillarGeo = new THREE.CylinderGeometry(0.08, 0.08, 4.6, 16);
+        const pillarMat = new THREE.MeshStandardMaterial({
+          color: 0x263044,
+          emissive: 0xa855f7,
+          emissiveIntensity: 0.35,
+          metalness: 0.8,
+          roughness: 0.2
+        });
+        const corners = [
+          [-2.25, 0.7, -2.25],
+          [2.25, 0.7, -2.25],
+          [-2.25, 0.7, 2.25],
+          [2.25, 0.7, 2.25]
+        ];
+        corners.forEach(([x, y, z]) => {
+          const p = new THREE.Mesh(pillarGeo, pillarMat);
+          p.position.set(x, y, z);
+          this.cabinetGroup.add(p);
+        });
+
+        // Top Neon Canopy Frame
+        const topFrameGeo = new THREE.BoxGeometry(4.7, 0.28, 4.7);
+        const topFrameMat = new THREE.MeshStandardMaterial({
+          color: 0x141a26,
+          emissive: 0xa855f7,
+          emissiveIntensity: 0.25,
+          metalness: 0.7,
+          roughness: 0.25
+        });
+        const topFrame = new THREE.Mesh(topFrameGeo, topFrameMat);
+        topFrame.position.y = 3.0;
+        this.cabinetGroup.add(topFrame);
+
+        // Translucent Glass Walls
+        const glassGeo = new THREE.BoxGeometry(4.48, 4.4, 4.48);
+        const glassMat = new THREE.MeshPhysicalMaterial({
+          color: 0x93c5fd,
+          transparent: true,
+          opacity: 0.07,
+          roughness: 0.1,
+          depthWrite: false
+        });
+        const glass = new THREE.Mesh(glassGeo, glassMat);
+        glass.position.y = 0.75;
+        this.cabinetGroup.add(glass);
+
+        this.scene.add(this.cabinetGroup);
+      }
+
+      buildPrizes() {
+        this.prizeMeshes = [];
+        const positions = [
+          { x: 0.9, z: -0.7, creature: CREATURES[0] },   // Legendary Gold
+          { x: -0.3, z: 0.2, creature: CREATURES[1] },   // Epic Violet
+          { x: 1.1, z: 0.9, creature: CREATURES[2] },    // Rare Blue
+          { x: -1.1, z: -0.9, creature: CREATURES[3] },  // Common Slate
+          { x: 0.1, z: -1.2, creature: CREATURES[4] },   // Common Slate
+          { x: 0.3, z: 1.2, creature: CREATURES[2] },    // Rare Blue
+          { x: -0.9, z: 0.6, creature: CREATURES[1] }    // Epic Violet
+        ];
+
+        positions.forEach((item, idx) => {
+          const group = new THREE.Group();
+          const colorHex = new THREE.Color(item.creature.color);
+
+          // Glowing Plush Capsule / Creature Orb
+          const bodyGeo = new THREE.DodecahedronGeometry(0.42, 1);
+          const bodyMat = new THREE.MeshStandardMaterial({
+            color: colorHex,
+            emissive: colorHex,
+            emissiveIntensity: 0.32,
+            roughness: 0.35,
+            metalness: 0.15
+          });
+          const body = new THREE.Mesh(bodyGeo, bodyMat);
+          group.add(body);
+
+          // Cute Ears / Horns silhouette on top
+          const earGeo = new THREE.ConeGeometry(0.13, 0.28, 8);
+          const earL = new THREE.Mesh(earGeo, bodyMat);
+          earL.position.set(-0.18, 0.38, 0);
+          earL.rotation.z = 0.25;
+          const earR = new THREE.Mesh(earGeo, bodyMat);
+          earR.position.set(0.18, 0.38, 0);
+          earR.rotation.z = -0.25;
+          group.add(earL, earR);
+
+          group.position.set(item.x, -1.02, item.z);
+          group.userData = {
+            baseY: -1.02,
+            phase: idx * 1.1,
+            creature: item.creature
+          };
+
+          this.scene.add(group);
+          this.prizeMeshes.push(group);
+        });
+
+        // Glowing Rarity Targeting Ring on floor
+        const ringGeo = new THREE.RingGeometry(0.48, 0.62, 32);
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: 0xa855f7,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.85
+        });
+        this.targetRing = new THREE.Mesh(ringGeo, ringMat);
+        this.targetRing.rotation.x = -Math.PI / 2;
+        this.targetRing.position.y = -1.38;
+        this.scene.add(this.targetRing);
+      }
+
+      buildClawAssembly() {
+        // Overhead Gantry Bar
+        const railGeo = new THREE.CylinderGeometry(0.05, 0.05, 4.3, 12);
+        const railMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.85, roughness: 0.2 });
+        this.gantryBar = new THREE.Mesh(railGeo, railMat);
+        this.gantryBar.rotation.z = Math.PI / 2;
+        this.gantryBar.position.y = 2.75;
+        this.scene.add(this.gantryBar);
+
+        // Claw Carriage & Tether
+        this.clawGroup = new THREE.Group();
+
+        const hubGeo = new THREE.CylinderGeometry(0.22, 0.26, 0.32, 16);
+        const hubMat = new THREE.MeshStandardMaterial({
+          color: 0x1e293b,
+          emissive: 0xa855f7,
+          emissiveIntensity: 0.55,
+          metalness: 0.8,
+          roughness: 0.2
+        });
+        const hub = new THREE.Mesh(hubGeo, hubMat);
+        this.clawGroup.add(hub);
+
+        // 3 Articulated Prongs
+        this.prongs = [];
+        const prongGeo = new THREE.BoxGeometry(0.08, 0.68, 0.08);
+        const prongMat = new THREE.MeshStandardMaterial({ color: 0xe8ecf4, metalness: 0.9, roughness: 0.15 });
+
+        for (let i = 0; i < 3; i++) {
+          const pivot = new THREE.Group();
+          pivot.rotation.y = (i * Math.PI * 2) / 3;
+          const arm = new THREE.Mesh(prongGeo, prongMat);
+          arm.position.set(0.24, -0.32, 0);
+          arm.rotation.z = 0.35;
+          pivot.add(arm);
+          this.clawGroup.add(pivot);
+          this.prongs.push(arm);
+        }
+
+        this.clawGroup.position.copy(this.clawPos);
+        this.scene.add(this.clawGroup);
+
+        // Vertical Cable from Gantry to Claw
+        const cableGeo = new THREE.CylinderGeometry(0.025, 0.025, 1, 8);
+        const cableMat = new THREE.MeshBasicMaterial({ color: 0xc084fc });
+        this.cableMesh = new THREE.Mesh(cableGeo, cableMat);
+        this.scene.add(this.cableMesh);
+
+        // Red Laser Beam + Floor Projection Dot
+        const laserGeo = new THREE.CylinderGeometry(0.012, 0.012, 3.6, 8);
+        const laserMat = new THREE.MeshBasicMaterial({
+          color: 0xf87171,
+          transparent: true,
+          opacity: 0.45
+        });
+        this.laserBeam = new THREE.Mesh(laserGeo, laserMat);
+        this.scene.add(this.laserBeam);
+
+        const dotGeo = new THREE.CircleGeometry(0.11, 20);
+        const dotMat = new THREE.MeshBasicMaterial({ color: 0xf87171 });
+        this.laserDot = new THREE.Mesh(dotGeo, dotMat);
+        this.laserDot.rotation.x = -Math.PI / 2;
+        this.laserDot.position.y = -1.37;
+        this.scene.add(this.laserDot);
+      }
+
+      bindOrbitEvents() {
+        const dom = this.renderer.domElement;
+        dom.addEventListener('pointerdown', e => {
+          this.isOrbiting = true;
+          this.prevPointer = { x: e.clientX, y: e.clientY };
+        });
+        window.addEventListener('pointermove', e => {
+          if (!this.isOrbiting) return;
+          const dx = e.clientX - this.prevPointer.x;
+          const dy = e.clientY - this.prevPointer.y;
+          this.prevPointer = { x: e.clientX, y: e.clientY };
+          this.orbitYaw -= dx * 0.007;
+          this.orbitPitch = Math.max(0.08, Math.min(0.75, this.orbitPitch + dy * 0.005));
+        });
+        window.addEventListener('pointerup', () => {
+          this.isOrbiting = false;
+        });
+      }
+
+      triggerDropAnimation(won, callback) {
+        this.dropPhase = 'descending';
+        this.wonCurrentDrop = won;
+        this.dropCallback = callback;
+      }
+
+      resetToAttract() {
+        this.dropPhase = 'idle';
+        if (this.grabbedMesh) {
+          this.grabbedMesh.position.y = this.grabbedMesh.userData.baseY;
+          this.grabbedMesh = null;
+        }
+        this.clawPos.set(0, 2.35, 0);
+        this.clawOpenAngle = 0.55;
+      }
+
+      update(dt, elapsed) {
+        // 1. Update Camera Orbit
+        const radius = this.isArcade ? 8.3 : 8.8;
+        this.camera.position.x = Math.sin(this.orbitYaw) * Math.cos(this.orbitPitch) * radius;
+        this.camera.position.z = Math.cos(this.orbitYaw) * Math.cos(this.orbitPitch) * radius;
+        this.camera.position.y = 0.6 + Math.sin(this.orbitPitch) * radius;
+        this.camera.lookAt(0, 0.35, 0);
+
+        // 2. Gentle rarity pulse on prizes
+        this.prizeMeshes.forEach(mesh => {
+          if (mesh !== this.grabbedMesh) {
+            mesh.position.y = mesh.userData.baseY + Math.sin(elapsed * 2.4 + mesh.userData.phase) * 0.04;
+            mesh.rotation.y = elapsed * 0.6 + mesh.userData.phase;
+          }
+        });
+
+        // 3. Claw Movement State Machine
+        const isLivePlay = this.isArcade && appState.mode === 'playing';
+
+        if (isLivePlay && this.dropPhase === 'idle') {
+          // Combine joystick + keyboard inputs
+          let vx = appState.joystickVec.x;
+          let vz = appState.joystickVec.z;
+          if (appState.keysPressed['a'] || appState.keysPressed['arrowleft']) vx -= 1;
+          if (appState.keysPressed['d'] || appState.keysPressed['arrowright']) vx += 1;
+          if (appState.keysPressed['w'] || appState.keysPressed['arrowup']) vz -= 1;
+          if (appState.keysPressed['s'] || appState.keysPressed['arrowdown']) vz += 1;
+
+          const speed = 2.6 * dt;
+          this.clawPos.x = Math.max(-1.75, Math.min(1.75, this.clawPos.x + vx * speed));
+          this.clawPos.z = Math.max(-1.75, Math.min(1.75, this.clawPos.z + vz * speed));
+
+          // Increment live ephemeral rollup TX counter when steering
+          if ((Math.abs(vx) > 0.05 || Math.abs(vz) > 0.05) && elapsed - this.lastTxTick > 0.22) {
+            this.lastTxTick = elapsed;
+            appState.txSent += 1;
+            const txEl = document.getElementById('hud-tx-count');
+            if (txEl) txEl.textContent = appState.txSent;
+            const latEl = document.getElementById('hud-latency');
+            if (latEl) latEl.textContent = `${14 + Math.floor(Math.random() * 6)}ms`;
+          }
+        } else if (!isLivePlay && this.dropPhase === 'idle') {
+          // Autonomous Attract Mode demo drift
+          this.clawPos.x = Math.sin(elapsed * 0.85) * 1.15;
+          this.clawPos.z = Math.cos(elapsed * 0.65) * 0.95;
+          this.clawOpenAngle = 0.52 + Math.sin(elapsed * 2.5) * 0.08;
+        } else if (this.dropPhase === 'descending') {
+          this.clawPos.y -= 3.2 * dt;
+          this.clawOpenAngle = 0.65;
+          if (this.clawPos.y <= -0.45) {
+            this.clawPos.y = -0.45;
+            this.dropPhase = 'closing';
+          }
+        } else if (this.dropPhase === 'closing') {
+          this.clawOpenAngle = Math.max(0.14, this.clawOpenAngle - 2.4 * dt);
+          if (this.clawOpenAngle <= 0.15) {
+            if (this.wonCurrentDrop && this.nearestPrize) {
+              this.grabbedMesh = this.nearestPrize;
+            }
+            this.dropPhase = 'rising';
+          }
+        } else if (this.dropPhase === 'rising') {
+          this.clawPos.y += 2.6 * dt;
+          if (this.grabbedMesh) {
+            this.grabbedMesh.position.set(this.clawPos.x, this.clawPos.y - 0.55, this.clawPos.z);
+          }
+          if (this.clawPos.y >= 2.35) {
+            this.clawPos.y = 2.35;
+            this.dropPhase = 'idle';
+            if (this.dropCallback) {
+              const cb = this.dropCallback;
+              this.dropCallback = null;
+              cb();
+            }
+          }
+        }
+
+        // 4. Find nearest creature & update targeting ring + live grip %
+        let nearest = this.prizeMeshes[0];
+        let minDist = Infinity;
+        this.prizeMeshes.forEach(p => {
+          const d = Math.hypot(p.position.x - this.clawPos.x, p.position.z - this.clawPos.z);
+          if (d < minDist) {
+            minDist = d;
+            nearest = p;
+          }
+        });
+        this.nearestPrize = nearest;
+
+        if (nearest) {
+          const c = nearest.userData.creature;
+          this.targetRing.position.set(nearest.position.x, -1.38, nearest.position.z);
+          this.targetRing.material.color.set(c.color);
+
+          // Alignment score [0.5 .. 1.35] based on proximity
+          const alignment = Math.max(0.5, Math.min(1.35, 1.35 - minDist * 0.55));
+          const scale = 0.85 + Math.min(0.45, minDist * 0.35);
+          this.targetRing.scale.set(scale, scale, 1);
+
+          if (this.isArcade) {
+            appState.targetedCreature = c;
+            appState.effectiveGrip = +(c.odds * alignment).toFixed(3);
+
+            const dot = document.getElementById('target-rarity-dot');
+            const nameEl = document.getElementById('target-creature-name');
+            const gripEl = document.getElementById('target-grip-mono');
+            if (dot && nameEl && gripEl) {
+              dot.style.backgroundColor = c.color;
+              nameEl.textContent = c.name;
+              gripEl.textContent = `${c.rarity} · ${(appState.effectiveGrip * 100).toFixed(1)}%`;
+              gripEl.style.color = c.color;
+            }
+          }
+        }
+
+        // 5. Sync Gantry, Claw Prongs, Cable & Laser Dot positions
+        this.gantryBar.position.z = this.clawPos.z;
+        this.clawGroup.position.copy(this.clawPos);
+        this.prongs.forEach(arm => {
+          arm.rotation.z = this.clawOpenAngle;
+        });
+
+        const cableLen = Math.max(0.1, 2.75 - this.clawPos.y);
+        this.cableMesh.scale.set(1, cableLen, 1);
+        this.cableMesh.position.set(this.clawPos.x, 2.75 - cableLen / 2, this.clawPos.z);
+
+        const laserLen = Math.max(0.1, this.clawPos.y - (-1.37));
+        this.laserBeam.scale.set(1, laserLen / 3.6, 1);
+        this.laserBeam.position.set(this.clawPos.x, -1.37 + laserLen / 2, this.clawPos.z);
+        this.laserBeam.visible = this.dropPhase === 'idle';
+        this.laserDot.position.set(this.clawPos.x, -1.37, this.clawPos.z);
+        this.laserDot.visible = this.dropPhase === 'idle';
+
+        this.renderer.render(this.scene, this.camera);
+      }
+
+      resize() {
+        const w = this.container.clientWidth;
+        const h = this.container.clientHeight;
+        if (!w || !h) return;
+        this.camera.aspect = w / h;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(w, h);
+      }
+    }
+
+    let heroMachineEngine = null;
+    window.arcadeMachineEngine = null;
+
+    function resize3DEngines() {
+      if (heroMachineEngine) heroMachineEngine.resize();
+      if (window.arcadeMachineEngine) window.arcadeMachineEngine.resize();
+    }
+
+    window.addEventListener('resize', resize3DEngines);
+
+
+    /*__GALAXY__*/
+
+    /* ---------- card micro-interactions: cursor spotlight, 3D tilt, scroll reveal, auto-advance ---------- */
+    document.addEventListener('pointermove', e => {
+      const el = e.target.closest && e.target.closest('.spot'); if (!el) return;
+      const r = el.getBoundingClientRect();
+      el.style.setProperty('--mx', (e.clientX - r.left) + 'px'); el.style.setProperty('--my', (e.clientY - r.top) + 'px');
+      if (el.classList.contains('tilt') || el.id === 'how-stage-card') {
+        const px = (e.clientX - r.left) / r.width - .5, py = (e.clientY - r.top) / r.height - .5, k = el.id === 'how-stage-card' ? 6 : 10;
+        el.style.transform = `perspective(900px) rotateY(${px * k}deg) rotateX(${-py * k}deg) translateY(-2px)`;
+      }
+    });
+    document.addEventListener('pointerleave', () => {}, true);
+    document.addEventListener('pointerout', e => { const el = e.target.closest && e.target.closest('.tilt, #how-stage-card'); if (el && !el.contains(e.relatedTarget)) el.style.transform = ''; });
+    window.addEventListener('DOMContentLoaded', () => {
+
+      // word-by-word blur-in for headings (React Bits "BlurText" style)
+      const split = (el, delay = 0) => {
+        let i = 0; const walk = n => { [...n.childNodes].forEach(c => {
+          if (c.nodeType === 3) { const f = document.createDocumentFragment(); c.textContent.split(/(\s+)/).forEach(w => { if (!w) return; if (/^\s+$/.test(w)) { f.appendChild(document.createTextNode(' ')); return; } const sp = document.createElement('span'); sp.className = 'split-word'; sp.style.setProperty('--i', i++); sp.style.setProperty('--d', delay + 'ms'); sp.textContent = w; f.appendChild(sp); }); c.replaceWith(f); }
+          else if (c.nodeType === 1) walk(c); }); }; walk(el); };
+      const heroH1 = document.querySelector('#hero h1'); if (heroH1) split(heroH1, 150);
+      const io2 = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { split(en.target); io2.unobserve(en.target); } }), { threshold: .4 });
+      document.querySelectorAll('section h2').forEach(h => { h.querySelectorAll('*').length >= 0 && (h.style.minHeight = '1em'); h.__w = 1; io2.observe(h); });
+      document.querySelectorAll('.glass-card').forEach(c => { if (c.closest('#view-arcade')) return; c.classList.add('spot'); if (!c.querySelector(':scope > .glare-sweep')) { c.classList.add('glare'); const sw = document.createElement('div'); sw.className = 'glare-sweep'; c.appendChild(sw); } });
+      document.querySelectorAll('.how-step-item').forEach(el => { const b = document.createElement('div'); b.className = 'how-bar'; el.appendChild(b); });
+      const list = document.getElementById('how-steps-list');
+      if (list) list.addEventListener('animationend', e => { if (e.animationName === 'howfill') setHowStep(((window.__howIdx || 0) + 1) % 4); });
+      const io = new IntersectionObserver(es => es.forEach(en => { if (en.isIntersecting) { en.target.classList.add('in'); io.unobserve(en.target); } }), { threshold: .15 });
+      document.querySelectorAll('#how-steps-list .how-step-item, #prizes .glass-card, .cta-rect').forEach((el, i) => { el.classList.add('reveal-up'); el.style.transitionDelay = (i % 5) * 70 + 'ms'; io.observe(el); });
+    });
+
+    /* -----------------------------------------------------------------------
+       13. BOOTSTRAP ON WINDOW LOAD
+    ----------------------------------------------------------------------- */
+    window.onload = function () {
+      // Populate hero floating sticker cards
+      document.getElementById('hero-float-card-1').innerHTML = art(CREATURES[0], 'idle');
+      document.getElementById('hero-float-card-2').innerHTML = art(CREATURES[1], 'idle');
+
+      // Render Landing sections
+      setHowStep(0);
+      filterLandingPrizes('All');
+      updateWalletUI();
+      initPlayControls();
+
+      // Initialize 3D Claw Machines
+      const heroHost = document.getElementById('hero-3d-container');
+      const arcadeHost = document.getElementById('arcade-3d-container');
+
+      if (heroHost && typeof THREE !== 'undefined') {
+        heroMachineEngine = new ClawMachine3D(heroHost, { isArcade: false });
+      }
+      if (arcadeHost && typeof THREE !== 'undefined') {
+        window.arcadeMachineEngine = new ClawMachine3D(arcadeHost, { isArcade: true });
+      }
+
+      new IntersectionObserver(e => { window.__heroVis = e[0].isIntersecting; }).observe(heroHost);
+      // Main Animation Loop
+      const globalClock = new THREE.Clock();
+      function animateLoop() {
+        requestAnimationFrame(animateLoop);
+        const dt = Math.min(0.05, globalClock.getDelta());
+        const elapsed = globalClock.getElapsedTime();
+
+        if (appState.currentView === 'landing' && heroMachineEngine && window.__heroVis !== false) {
+          heroMachineEngine.update(dt, elapsed);
+        }
+        if ((appState.currentView === 'arcade' || appState.currentView === 'play') && window.arcadeMachineEngine) {
+          window.arcadeMachineEngine.update(dt, elapsed);
+        }
+      }
+      animateLoop();
+    };
+  </script>
+</body>
+</html>
