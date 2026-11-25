@@ -1,0 +1,47 @@
+{
+  "name": "claw-drop",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "setup-machine": "RES_OPTIONS=\"timeout:1 attempts:3 rotate\" tsx scripts/setup-machine.ts",
+    "e2e": "RES_OPTIONS=\"timeout:1 attempts:3 rotate\" tsx scripts/e2e.ts",
+    "idl": "pnpm --filter @clawdrop/sdk idl",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "app-check": "RES_OPTIONS=\"timeout:1 attempts:3 rotate\" tsx scripts/app-chain-check.ts"
+  },
+  "dependencies": {
+    "@clawdrop/sdk": "workspace:*",
+    "@coral-xyz/anchor": "^0.31.1",
+    "@lottiefiles/dotlottie-web": "0.83.2",
+    "@magicblock-labs/ephemeral-rollups-sdk": "0.16.2",
+    "@solana-mobile/wallet-standard-mobile": "^0.7.1",
+    "@solana/wallet-standard-features": "^1.5.0",
+    "@solana/web3.js": "^1.98.0",
+    "@wallet-standard/app": "^1.1.1",
+    "@wallet-standard/base": "^1.1.1",
+    "@wallet-standard/features": "^1.1.1",
+    "lucide-react": "^1.79.0",
+    "next": "^15.5.29",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "three": "0.170.0",
+    "zustand": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.3.1",
+    "@types/react-dom": "^19.3.0",
+    "@types/three": "0.170.0",
+    "autoprefixer": "^10.7.0",
+    "playwright-core": "^1.65.1",
+    "postcss": "^8.5.33",
+    "tailwindcss": "3.4.19",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^5.1.1"
+  }
+}
